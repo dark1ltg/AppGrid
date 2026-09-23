@@ -1,0 +1,7 @@
+appgrid (1.0.0-1) noble; urgency=medium
+
+  * Initial Qt 6 rewrite with APT and optional Flatpak.
+  * Target Ubuntu 24.04 LTS, Debian 12, and derivatives (Mint 22,
+    elementary OS 8, Pop!_OS 24.04). Uses distro PyQt6, not PySide6.
+
+ -- AppGrid contributors <appgrid@localhost>  Sat, 12 Sep 2026 22:42:00 -0400

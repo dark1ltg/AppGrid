@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+export PYBUILD_NAME=appgrid
+export PYBUILD_SYSTEM=pyproject
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_install:
+	dh_install
+	dh_icons

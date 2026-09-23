@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "appgrid"
+version = "1.0.0"
+description = "Lightweight Qt software store for Ubuntu/Debian APT and Flatpak"
+readme = "README.md"
+license = { text = "BSD-2-Clause" }
+requires-python = ">=3.10"
+authors = [{ name = "AppGrid contributors" }]
+# Distro Qt packages only. Do not depend on the PyPI PySide6 wheel — it ships all of Qt.
+
+[project.scripts]
+appgrid = "appgrid.__main__:main"
+appgrid-apt-helper = "appgrid.helpers.apt_helper:main"
+
+[tool.setuptools.packages.find]
+include = ["appgrid*"]
+
+[tool.setuptools.package-data]
+appgrid = ["qml/*.qml", "qml/qmldir", "data/*"]

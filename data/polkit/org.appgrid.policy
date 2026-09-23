@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>AppGrid</vendor>
+  <vendor_url>https://github.com/appgrid/appgrid</vendor_url>
+  <action id="org.appgrid.apt">
+    <description>Install or remove software with AppGrid</description>
+    <description xml:lang="en">Install or remove software with AppGrid</description>
+    <message>Authentication is required to install, remove, or update software</message>
+    <message xml:lang="en">Authentication is required to install, remove, or update software</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/appgrid-apt-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

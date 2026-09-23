@@ -1,0 +1,40 @@
+Source: appgrid
+Section: utils
+Priority: optional
+Maintainer: AppGrid contributors <appgrid@localhost>
+Build-Depends: debhelper-compat (= 13), dh-python, python3, python3-all,
+ python3-setuptools, python3-wheel
+Standards-Version: 4.6.2
+Homepage: https://github.com/appgrid/appgrid
+X-Ubuntu-Target: 24.04
+# Baseline: Ubuntu 24.04 LTS (noble) / Debian 12 (bookworm) and derivatives
+# (Linux Mint 22, elementary OS 8, Pop!_OS 24.04, and similar).
+
+Package: appgrid
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends},
+ python3-pyside6.qtcore | python3-pyqt6,
+ python3-pyside6.qtgui | python3-pyqt6,
+ python3-pyside6.qtqml | python3-pyqt6.qtqml,
+ python3-pyside6.qtquick | python3-pyqt6.qtquick,
+ python3-pyside6.qtquickcontrols2 | python3-pyqt6.qtquick,
+ qml6-module-qtquick,
+ qml6-module-qtquick-controls,
+ qml6-module-qtquick-layouts,
+ qml6-module-qtquick-window,
+ python3-gi,
+ gir1.2-appstream-1.0,
+ libqt6svg6,
+ packagekit,
+ packagekit-tools,
+ pkexec,
+ hicolor-icon-theme,
+ fonts-ubuntu | fonts-liberation
+Recommends: flatpak
+Suggests: python3-apt
+Description: Lightweight Qt software store for APT and Flatpak
+ AppGrid shows desktop applications in a screenshot grid, with search,
+ install, remove, and updates. Baseline is Ubuntu 24.04 LTS (noble) and
+ Debian 12 (bookworm), including Mint 22, elementary OS 8, Pop!_OS 24.04,
+ and other 24.04/bookworm-based distributions. On 24.04 the UI uses PyQt6;
+ on 24.10+ / Debian 13+ apt prefers split PySide6 when those packages exist.

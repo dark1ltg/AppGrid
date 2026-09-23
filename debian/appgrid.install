@@ -1,0 +1,4 @@
+data/polkit/org.appgrid.policy usr/share/polkit-1/actions/
+data/appgrid.desktop usr/share/applications/
+data/metainfo/org.appgrid.AppGrid.metainfo.xml usr/share/metainfo/
+appgrid/data/appgrid.svg usr/share/icons/hicolor/scalable/apps/appgrid.svg

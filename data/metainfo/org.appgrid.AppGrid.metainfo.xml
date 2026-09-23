@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.appgrid.AppGrid</id>
+  <name>AppGrid</name>
+  <summary>Browse, install, and update APT and Flatpak applications</summary>
+  <developer_name>AppGrid contributors</developer_name>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-2-Clause</project_license>
+  <launchable type="desktop-id">appgrid.desktop</launchable>
+  <url type="homepage">https://github.com/appgrid/appgrid</url>
+  <description>
+    <p>
+      AppGrid is a screenshot-grid software store for Ubuntu 24.04 LTS,
+      Debian 12, and distributions based on those releases. Double-click
+      this package in Files to open App Center, GNOME Software, or GDebi,
+      then choose Install.
+    </p>
+    <p>
+      Search, install, and remove desktop apps from APT. Optional Flatpak
+      support can be turned on later in Settings. System updates use the
+      normal administrator password prompt.
+    </p>
+  </description>
+  <categories>
+    <category>System</category>
+    <category>PackageManager</category>
+  </categories>
+  <provides>
+    <binary>appgrid</binary>
+    <id>appgrid.desktop</id>
+  </provides>
+  <icon type="local">/usr/share/icons/hicolor/scalable/apps/appgrid.svg</icon>
+  <content_rating type="oars-1.1"/>
+</component>
