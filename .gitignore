@@ -2,8 +2,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
-dist/
-build/
 .pytest_cache/
 *.qmlc
 .DS_Store
+build/chroots/
+build/noble-debs/
+build/tools/
