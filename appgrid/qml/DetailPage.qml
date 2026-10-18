@@ -149,10 +149,12 @@ Page {
                     font.weight: Fonts.bold
                     color: "#F2F6FB"
                     wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
                 Rectangle {
                     visible: controller.selectedCategory !== ""
+                    Layout.alignment: Qt.AlignHCenter
                     implicitWidth: categoryLabel.implicitWidth + 16
                     implicitHeight: 24
                     radius: 12
@@ -174,6 +176,7 @@ Page {
                     font.pixelSize: Fonts.description
                     font.weight: Fonts.regular
                     color: "#9AA8BA"
+                    horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
                 Label {
@@ -183,6 +186,7 @@ Page {
                     font.weight: Fonts.regular
                     color: "#C5D0DF"
                     wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
                 Label {
@@ -192,6 +196,8 @@ Page {
                     font.family: Fonts.sans
                     font.pixelSize: Fonts.rating
                     font.weight: Fonts.regular
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
                 }
                 Label {
                     text: controller.selectedInstalled ? "Installed" : "Not installed"
@@ -199,6 +205,8 @@ Page {
                     font.family: Fonts.sans
                     font.pixelSize: Fonts.status
                     font.weight: Fonts.medium
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
                 }
                 Button {
                     visible: controller.selectedPrimaryAction !== ""
@@ -231,33 +239,36 @@ Page {
                             controller.installSelected()
                     }
                 }
-                Button {
-                    id: removeButton
+                Item {
                     visible: controller.selectedCanRemove
-                    text: "Remove"
-                    font.family: Fonts.sans
-                    font.pixelSize: Fonts.button
-                    font.weight: Fonts.medium
-                    enabled: !controller.busy && controller.selectedUid !== ""
-                    Layout.alignment: Qt.AlignLeft
-                    Layout.fillWidth: false
+                    Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    implicitWidth: contentItem.implicitWidth + leftPadding + rightPadding
-                    leftPadding: 14
-                    rightPadding: 14
-                    onClicked: removeConfirm.open()
-                    background: Rectangle {
-                        radius: 8
-                        color: removeButton.hovered ? "#332028" : "transparent"
-                        border.width: 1
-                        border.color: removeButton.hovered ? "#A85C5C" : "#4A5564"
-                    }
-                    contentItem: Text {
-                        text: removeButton.text
-                        font: removeButton.font
-                        color: removeButton.hovered ? "#E8A0A0" : "#C5D0DF"
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    Button {
+                        id: removeButton
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Remove"
+                        font.family: Fonts.sans
+                        font.pixelSize: Fonts.button
+                        font.weight: Fonts.medium
+                        enabled: !controller.busy && controller.selectedUid !== ""
+                        height: 36
+                        width: contentItem.implicitWidth + leftPadding + rightPadding
+                        leftPadding: 14
+                        rightPadding: 14
+                        onClicked: removeConfirm.open()
+                        background: Rectangle {
+                            radius: 8
+                            color: removeButton.hovered ? "#332028" : "transparent"
+                            border.width: 1
+                            border.color: removeButton.hovered ? "#A85C5C" : "#4A5564"
+                        }
+                        contentItem: Text {
+                            text: removeButton.text
+                            font: removeButton.font
+                            color: removeButton.hovered ? "#E8A0A0" : "#C5D0DF"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
                 }
                 ScrollView {
@@ -269,6 +280,7 @@ Page {
                     Label {
                         width: descScroll.availableWidth
                         text: controller.selectedDescription
+                        horizontalAlignment: Text.AlignLeft
                         wrapMode: Text.WordWrap
                         textFormat: Text.PlainText
                         color: "#B7C4D2"
