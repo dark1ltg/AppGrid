@@ -18,6 +18,7 @@ class AppController(QObject):
     statusChanged = Signal()
     selectionChanged = Signal()
     busyChanged = Signal()
+    progressChanged = Signal()
     filterChanged = Signal()
     settingsChanged = Signal()
 
@@ -41,6 +42,7 @@ class AppController(QObject):
         self._model = AppFilterModel(self._source)
         self._status = "Loading apps…"
         self._busy = True
+        self._progress_percent = -1  # -1 = indeterminate (no fake 0–100)
         self._filter = "all"
         self._category = ""
         self._query = ""
@@ -81,6 +83,36 @@ class AppController(QObject):
     def _set_busy(self, value: bool) -> None:
         self._busy = value
         self.busyChanged.emit()
+        if not value:
+            self._set_progress_percent(-1)
+
+    @Property(int, notify=progressChanged)
+    def progressPercent(self) -> int:
+        """0–100 when a backend reported percent; -1 when indeterminate."""
+        return self._progress_percent
+
+    @Property(bool, notify=progressChanged)
+    def progressKnown(self) -> bool:
+        return self._progress_percent >= 0
+
+    def _set_progress_percent(self, value: int) -> None:
+        percent = int(value)
+        if percent < 0 or percent > 100:
+            percent = -1
+        if percent == self._progress_percent:
+            return
+        self._progress_percent = percent
+        self.progressChanged.emit()
+
+    @Slot(int)
+    def previewProgress(self, percent: int) -> None:
+        """Screenshot / demo helper: show busy footer with a known percent."""
+        self._set_busy(True)
+        self._set_progress_percent(percent)
+        if percent >= 0:
+            self._set_status(f"Installing… {percent}%")
+        else:
+            self._set_status("Working…")
 
     @Property(str, notify=filterChanged)
     def filterMode(self) -> str:
@@ -288,6 +320,7 @@ class AppController(QObject):
         self._reload_refresh = False
         has_grid = bool(self._source.entries())
         self._set_busy(not has_grid)
+        self._set_progress_percent(-1)
         if use_refresh:
             self._set_status("Checking for updates…")
         elif has_grid:
@@ -306,6 +339,7 @@ class AppController(QObject):
         worker.loaded.connect(self._on_catalog)
         worker.failed.connect(self._on_catalog_fail)
         worker.progress.connect(self._set_status)
+        worker.progressPercent.connect(self._set_progress_percent)
         worker.indexesRefreshed.connect(self._on_indexes_refreshed)
         worker.finished.connect(worker.deleteLater)
         self._catalog_worker = worker
@@ -440,6 +474,7 @@ class AppController(QObject):
                 "update": f"Updating {entry.name}…",
             }[action]
         self._set_busy(True)
+        self._set_progress_percent(-1)
         self._set_status(label)
         try:
             jobs.reset()
@@ -449,6 +484,7 @@ class AppController(QObject):
             self._worker.finished_ok.connect(self._on_ok)
             self._worker.failed.connect(self._on_fail)
             self._worker.progress.connect(self._set_status)
+            self._worker.progressPercent.connect(self._set_progress_percent)
             self._worker.finished.connect(self._worker.deleteLater)
             self._worker.start()
         except Exception as exc:  # noqa: BLE001

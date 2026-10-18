@@ -27,6 +27,7 @@ class CatalogWorker(QThread):
     loaded = Signal(object)
     failed = Signal(str)
     progress = Signal(str)
+    progressPercent = Signal(int)  # -1 = indeterminate
     indexesRefreshed = Signal(bool)
 
     def __init__(
@@ -43,7 +44,8 @@ class CatalogWorker(QThread):
         self._refresh_indexes = refresh_indexes
 
     def run(self) -> None:
-        progress.set_reporter(self.progress.emit)
+        progress.set_reporter(self.progress.emit, self.progressPercent.emit)
+        progress.report_percent(None)
         try:
             if self._refresh_indexes:
                 try:
@@ -81,6 +83,7 @@ class ActionWorker(QThread):
     finished_ok = Signal(str)
     failed = Signal(str)
     progress = Signal(str)
+    progressPercent = Signal(int)  # -1 = indeterminate
 
     def __init__(
         self,
@@ -144,7 +147,8 @@ class ActionWorker(QThread):
         return message
 
     def run(self) -> None:
-        progress.set_reporter(self.progress.emit)
+        progress.set_reporter(self.progress.emit, self.progressPercent.emit)
+        progress.report_percent(None)
         try:
             if self._action == "update-all":
                 completed = 0

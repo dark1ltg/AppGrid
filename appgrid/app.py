@@ -121,7 +121,30 @@ def main(argv: list[str] | None = None) -> int:
             if detail:
                 controller.select(detail)
                 window.setProperty("shotDetailUid", detail)
-                QTimer.singleShot(1800, grab)
+
+                def grab_detail() -> None:
+                    shot_progress = os.environ.get("APPGRID_SHOT_PROGRESS")
+                    if shot_progress is not None:
+                        try:
+                            percent = int(shot_progress)
+                        except ValueError:
+                            percent = 42
+                        controller.previewProgress(percent)
+                        QTimer.singleShot(400, grab)
+                        return
+                    grab()
+
+                QTimer.singleShot(1800, grab_detail)
+                return
+            shot_progress = os.environ.get("APPGRID_SHOT_PROGRESS")
+            if shot_progress is not None:
+                try:
+                    percent = int(shot_progress)
+                except ValueError:
+                    percent = 42
+                controller.previewProgress(percent)
+                # Keep busy for the grab; don't wait for catalog idle after this.
+                QTimer.singleShot(400, grab)
                 return
             QTimer.singleShot(1200, grab)
 

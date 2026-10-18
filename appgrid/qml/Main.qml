@@ -128,11 +128,24 @@ ApplicationWindow {
                 visible: controller.busy && controller.supportedDistro
                 onClicked: controller.cancelJob()
             }
-            BusyIndicator {
+            Item {
+                id: busyBadge
                 visible: controller.busy
-                running: controller.busy
-                implicitWidth: 22
-                implicitHeight: 22
+                implicitWidth: 32
+                implicitHeight: 32
+                BusyIndicator {
+                    anchors.fill: parent
+                    running: controller.busy
+                }
+                Label {
+                    anchors.centerIn: parent
+                    visible: controller.progressKnown
+                    text: controller.progressPercent + "%"
+                    color: "#F2F6FB"
+                    font.family: Fonts.sans
+                    font.pixelSize: Fonts.badge
+                    font.weight: Fonts.medium
+                }
             }
         }
     }
