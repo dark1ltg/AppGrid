@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from appgrid.qt import Property, QObject, Signal, Slot
+from appgrid.qt import Property, QObject, QTimer, Signal, Slot
 
 from appgrid.backends.base import AppEntry
 from appgrid.backends.registry import BackendRegistry
@@ -323,8 +323,27 @@ class AppController(QObject):
             return
         self.reload()
 
+    @staticmethod
+    def _thread_running(worker) -> bool:
+        if worker is None:
+            return False
+        try:
+            return bool(worker.isRunning())
+        except RuntimeError:
+            # QObject already destroyed via deleteLater.
+            return False
+
     def _action_running(self) -> bool:
-        return self._worker is not None and self._worker.isRunning()
+        running = self._thread_running(self._worker)
+        if not running:
+            self._worker = None
+        return running
+
+    def _catalog_running(self) -> bool:
+        running = self._thread_running(self._catalog_worker)
+        if not running:
+            self._catalog_worker = None
+        return running
 
     @Slot()
     def reload(self) -> None:
@@ -340,7 +359,7 @@ class AppController(QObject):
         if self._action_running():
             self._reload_again = True
             return
-        if self._catalog_worker is not None and self._catalog_worker.isRunning():
+        if self._catalog_running():
             self._reload_again = True
             return
         use_refresh = self._reload_refresh
@@ -486,7 +505,7 @@ class AppController(QObject):
             return
         if self._busy:
             return
-        if self._catalog_worker is not None and self._catalog_worker.isRunning():
+        if self._catalog_running():
             self._set_status("Still loading the app list…")
             return
         entry = self._selected
@@ -534,6 +553,26 @@ class AppController(QObject):
         self._pending_status = text
         self._set_status(text)
         self._index_refresh_pending = False
+        self._reload_refresh = False
+        self._set_busy(False)
+        # failed/finished are queued; the action thread may still look "running".
+        self._reload_again = True
+        worker = self._worker
+        if worker is not None and self._action_running():
+            worker.finished.connect(self._reload_after_failed_action)
+        QTimer.singleShot(0, self._reload_after_failed_action)
+
+    def _reload_after_failed_action(self) -> None:
+        if self._action_running():
+            return
+        worker = self._worker
+        if worker is not None:
+            try:
+                worker.finished.disconnect(self._reload_after_failed_action)
+            except (TypeError, RuntimeError):
+                pass
+        if not self._reload_again:
+            return
         self._reload_again = False
         self.reload()
 
