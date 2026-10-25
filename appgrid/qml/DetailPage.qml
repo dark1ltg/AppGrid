@@ -200,8 +200,9 @@ Page {
                     Layout.fillWidth: true
                 }
                 Label {
-                    text: controller.selectedInstalled ? "Installed" : "Not installed"
-                    color: controller.selectedInstalled ? "#6FCFC6" : "#9AA8BA"
+                    text: controller.selectedStatusLabel
+                    color: controller.selectedInstalled
+                           || controller.activeAction !== "" ? "#6FCFC6" : "#9AA8BA"
                     font.family: Fonts.sans
                     font.pixelSize: Fonts.status
                     font.weight: Fonts.medium

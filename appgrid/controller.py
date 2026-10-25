@@ -48,6 +48,7 @@ class AppController(QObject):
         self._query = ""
         self._selected: AppEntry | None = None
         self._pending_status: str | None = None
+        self._active_action: str = ""
         self._worker: ActionWorker | None = None
         self._catalog_worker: CatalogWorker | None = None
         self._reload_again = False
@@ -241,6 +242,32 @@ class AppController(QObject):
     @Property(bool, notify=selectionChanged)
     def selectedInstalled(self) -> bool:
         return bool(self._installed_native_copies())
+
+    @Property(str, notify=selectionChanged)
+    def selectedStatusLabel(self) -> str:
+        """Detail-page install status: live job verb, or Installed / Not Installed."""
+        action = self._active_action
+        if action == "install":
+            return "Installing…"
+        if action == "update":
+            return "Updating…"
+        if action == "remove":
+            return "Removing…"
+        if self._installed_native_copies():
+            return "Installed"
+        return "Not Installed"
+
+    @Property(str, notify=busyChanged)
+    def activeAction(self) -> str:
+        return self._active_action
+
+    def _set_active_action(self, action: str) -> None:
+        action = action or ""
+        if action == self._active_action:
+            return
+        self._active_action = action
+        self.busyChanged.emit()
+        self.selectionChanged.emit()
 
     @Property(bool, notify=selectionChanged)
     def selectedHasUpdate(self) -> bool:
@@ -473,6 +500,7 @@ class AppController(QObject):
                 "remove": f"Removing {entry.name}…",
                 "update": f"Updating {entry.name}…",
             }[action]
+        self._set_active_action(action)
         self._set_busy(True)
         self._set_progress_percent(-1)
         self._set_status(label)
@@ -488,20 +516,26 @@ class AppController(QObject):
             self._worker.finished.connect(self._worker.deleteLater)
             self._worker.start()
         except Exception as exc:  # noqa: BLE001
+            self._set_active_action("")
             self._set_busy(False)
             self._set_status(str(exc) or "Could not start that action")
 
     def _on_ok(self, message: str) -> None:
+        self._set_active_action("")
         self._pending_status = message
         self.reload()
 
     def _on_fail(self, message: str) -> None:
-        self._set_status(message)
-        self._set_busy(False)
+        # Refresh install flags after fail/cancel so DetailPage/grid match reality:
+        # failed install with nothing installed → Not Installed; failed update/remove
+        # that left the app installed → stay Installed (failure stays in the footer).
+        self._set_active_action("")
+        text = message or "Action failed"
+        self._pending_status = text
+        self._set_status(text)
         self._index_refresh_pending = False
-        if self._reload_again or self._reload_refresh:
-            self._reload_again = False
-            self._reload(False)
+        self._reload_again = False
+        self.reload()
 
     @Slot()
     def cancelJob(self) -> None:
