@@ -6,9 +6,21 @@ from collections.abc import Callable
 _reporter: Callable[[str], None] | None = None
 _percent_reporter: Callable[[int], None] | None = None
 
-# Last 0–100% in a line (pkcon / flatpak / apt-style progress).
+# Prefer pkcon / flatpak / apt progress phrasing over arbitrary "N%" tokens (#15).
 # Avoid matching the fractional digit in values like "3.0%".
-_PERCENT = re.compile(r"(?<![.\d])(\d{1,3})\s*%")
+_PERCENT_PATTERNS = (
+    re.compile(
+        r"(?:progress|percentage|downloaded|downloading|installing|updating|removing|"
+        r"transferring|receiving|deploying|extracting|configuring)"
+        r"[^\d%]{0,80}(?<![.\d])(\d{1,3})\s*%",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?<![.\d])(\d{1,3})\s*%\s*(?:complete|done|downloaded|finished)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\[\s*(?<![.\d])(\d{1,3})\s*%\s*]"),
+)
 
 
 def set_reporter(
@@ -25,12 +37,13 @@ def extract_percent(message: str) -> int | None:
     """Return 0–100 if the line reports a real percentage, else None."""
     if not message:
         return None
-    matches = _PERCENT.findall(message)
-    if not matches:
-        return None
-    value = int(matches[-1])
-    if 0 <= value <= 100:
-        return value
+    for pattern in _PERCENT_PATTERNS:
+        matches = pattern.findall(message)
+        if not matches:
+            continue
+        value = int(matches[-1])
+        if 0 <= value <= 100:
+            return value
     return None
 
 
@@ -52,6 +65,5 @@ def report(message: str) -> None:
     if len(line) > 140:
         line = line[:137] + "…"
     _reporter(line)
-    pct = extract_percent(line)
-    if pct is not None:
-        report_percent(pct)
+    # Always sync percent to the latest line so stale % does not stick (#5).
+    report_percent(extract_percent(line))

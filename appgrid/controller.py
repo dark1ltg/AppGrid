@@ -223,9 +223,13 @@ class AppController(QObject):
     def selectedPrimaryAction(self) -> str:
         if not self._selected:
             return ""
-        if self._installed_native_copies() and self._selected.has_update:
+        installed = self._installed_native_copies()
+        if installed and self._selected.has_update:
             return "update"
-        if not self._installed_native_copies():
+        if not installed:
+            return "install"
+        # Older copy installed, but the card face is a newer uninstalled source (#3).
+        if not self._selected.self_installed and self._selected.backend in {"apt", "flatpak"}:
             return "install"
         return ""
 
@@ -247,12 +251,16 @@ class AppController(QObject):
     def selectedStatusLabel(self) -> str:
         """Detail-page install status: live job verb, or Installed / Not Installed."""
         action = self._active_action
+        if action == "cancelling":
+            return "Cancelling…"
         if action == "install":
             return "Installing…"
         if action == "update":
             return "Updating…"
         if action == "remove":
             return "Removing…"
+        if action == "update-all":
+            return "Updating…"
         if self._installed_native_copies():
             return "Installed"
         return "Not Installed"
@@ -275,7 +283,7 @@ class AppController(QObject):
 
     @Property(bool, notify=selectionChanged)
     def selectedCanInstall(self) -> bool:
-        return bool(self._selected and not self._selected.self_installed)
+        return bool(self._selected and self.selectedPrimaryAction == "install")
 
     @Property(bool, notify=selectionChanged)
     def selectedCanRemove(self) -> bool:
@@ -395,7 +403,7 @@ class AppController(QObject):
         self._apply_catalog(list(apps) if apps else [])
         if self._reload_again and not self._action_running():
             worker = self._catalog_worker
-            if worker is None or not worker.isRunning():
+            if worker is None or not self._thread_running(worker):
                 self._reload_again = False
                 self._reload(False)
 
@@ -540,9 +548,15 @@ class AppController(QObject):
             self._set_status(str(exc) or "Could not start that action")
 
     def _on_ok(self, message: str) -> None:
+        # Mirror fail-path: deferred reload until the action thread has stopped (#1).
         self._set_active_action("")
         self._pending_status = message
-        self.reload()
+        self._set_status(message or "Done")
+        self._reload_again = True
+        worker = self._worker
+        if worker is not None and self._action_running():
+            worker.finished.connect(self._reload_after_action)
+        QTimer.singleShot(0, self._reload_after_action)
 
     def _on_fail(self, message: str) -> None:
         # Refresh install flags after fail/cancel so DetailPage/grid match reality:
@@ -554,24 +568,25 @@ class AppController(QObject):
         self._set_status(text)
         self._index_refresh_pending = False
         self._reload_refresh = False
-        self._set_busy(False)
-        # failed/finished are queued; the action thread may still look "running".
+        # Keep busy until reload starts so a new action cannot interleave (#6).
         self._reload_again = True
         worker = self._worker
         if worker is not None and self._action_running():
-            worker.finished.connect(self._reload_after_failed_action)
-        QTimer.singleShot(0, self._reload_after_failed_action)
+            worker.finished.connect(self._reload_after_action)
+        QTimer.singleShot(0, self._reload_after_action)
 
-    def _reload_after_failed_action(self) -> None:
+    def _reload_after_action(self) -> None:
         if self._action_running():
             return
         worker = self._worker
         if worker is not None:
             try:
-                worker.finished.disconnect(self._reload_after_failed_action)
+                worker.finished.disconnect(self._reload_after_action)
             except (TypeError, RuntimeError):
                 pass
         if not self._reload_again:
+            if not self._catalog_running():
+                self._set_busy(False)
             return
         self._reload_again = False
         self.reload()
@@ -582,4 +597,5 @@ class AppController(QObject):
             return
         jobs.request()
         self._reload_again = False
+        self._set_active_action("cancelling")
         self._set_status("Cancelling…")

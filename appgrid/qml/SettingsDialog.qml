@@ -50,7 +50,7 @@ Dialog {
             font.family: Fonts.sans
             font.pixelSize: Fonts.settings
             font.weight: Fonts.regular
-            text: "Off: install from " + controller.nativeStoreLabel + " only. On: Flathub is included too, still one card per app. Install uses the newer copy — " + controller.nativeStoreLabel + " if that version is newer or the same, Flatpak if Flathub is newer."
+            text: "Off: install from " + controller.nativeStoreLabel + " only. On: Flathub is included too, still one card per app. The card face is the newer copy — " + controller.nativeStoreLabel + " when that version is newer or the same, Flatpak when Flathub is newer. Install installs that newer copy even if an older one is already installed."
         }
 
         Label {

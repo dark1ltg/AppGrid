@@ -89,12 +89,22 @@ class FlatpakBackend(PackageBackend):
             )
         return entries
 
+    @staticmethod
+    def _looks_cancelled(output: str) -> bool:
+        text = (output or "").lower()
+        return any(
+            token in text
+            for token in ("dismissed", "not authorized", "cancelled", "canceled")
+        )
+
     def _run(self, args: list[str]) -> None:
         binary = shutil.which("flatpak")
         if not binary:
             raise RuntimeError("flatpak is not installed")
         code, output = run_streaming([binary, *args])
         if code != 0:
+            if self._looks_cancelled(output):
+                raise CancelledError("Cancelled.")
             raise RuntimeError(output or f"flatpak {' '.join(args)} failed")
 
     def install(self, entry: AppEntry) -> None:
@@ -132,4 +142,19 @@ class FlatpakBackend(PackageBackend):
             raise RuntimeError(errors[-1])
 
     def update_all(self) -> None:
-        self._run(["update", "-y", "--user"])
+        # Per-app update walks user+system; update-all must too (#2).
+        errors: list[str] = []
+        done = 0
+        for scope in ("user", "system"):
+            try:
+                self._run(["update", "-y", f"--{scope}"])
+                done += 1
+            except CancelledError:
+                # Auth dismiss on one scope: keep updates already applied.
+                if done:
+                    return
+                raise
+            except Exception as exc:  # noqa: BLE001
+                errors.append(str(exc))
+        if done == 0:
+            raise RuntimeError(errors[-1] if errors else "flatpak update failed")

@@ -67,10 +67,10 @@ def _pkcon() -> str | None:
 
 
 def _helper() -> str | None:
-    """Only binaries PolicyKit is allowed to run (not a pip/venv copy on PATH)."""
-    for candidate in ("/usr/bin/appgrid-apt-helper", "/usr/libexec/appgrid/apt-helper"):
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
+    """Only the PolicyKit-annotated helper path (see data/polkit/org.appgrid.policy)."""
+    candidate = "/usr/bin/appgrid-apt-helper"
+    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
     return None
 
 

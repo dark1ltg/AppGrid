@@ -141,10 +141,13 @@ class ActionWorker(QThread):
                 errors.append(str(exc))
         if done == 0:
             raise RuntimeError(errors[-1] if errors else f"Could not {action} {entry.name}")
-        message = f"{verb} {entry.name}"
+        # Partial multi-copy success is not full success (#10).
         if errors:
-            message += ". Another copy could not be changed."
-        return message
+            raise RuntimeError(
+                f"Could not fully {action} {entry.name} "
+                f"({done}/{len(targets)} copies ok). {errors[-1]}"
+            )
+        return f"{verb} {entry.name}"
 
     def run(self) -> None:
         progress.set_reporter(self.progress.emit, self.progressPercent.emit)

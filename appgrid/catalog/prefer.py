@@ -61,11 +61,16 @@ def _id_tail(value: str) -> str | None:
 
 
 def _cmp_versions(left: str, right: str) -> int:
-    """Compare Debian-style versions (epoch, upstream, revision)."""
+    """Compare Debian-style versions (epoch, upstream, revision).
+
+    A real version beats an empty one (#4).
+    """
     if not left and not right:
         return 0
-    if not left or not right:
-        return 0
+    if not left:
+        return -1
+    if not right:
+        return 1
     return _cmp_debian(left, right)
 
 
@@ -136,17 +141,35 @@ def _debian_weight(char: str) -> tuple[int, int]:
 
 
 def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
-    """Pick the newest build. On a tie or missing versions, prefer native APT."""
-    if left.version and right.version:
-        by_version = _cmp_versions(left.version, right.version)
-        if by_version > 0:
+    """Pick the newest build.
+
+    Same-backend APT: Debian version compare.
+    Cross-backend: prefer release_ts (Flatpak runtime-style versions mis-rank as Debian) (#8).
+    A side with a version beats an empty version (#4).
+    On a remaining tie, prefer native APT.
+    """
+    same_backend = left.backend == right.backend
+    if same_backend:
+        if left.version or right.version:
+            by_version = _cmp_versions(left.version, right.version)
+            if by_version > 0:
+                return left
+            if by_version < 0:
+                return right
+        if left.release_ts and right.release_ts:
+            if left.release_ts > right.release_ts:
+                return left
+            if right.release_ts > left.release_ts:
+                return right
+    else:
+        if left.release_ts and right.release_ts:
+            if left.release_ts > right.release_ts:
+                return left
+            if right.release_ts > left.release_ts:
+                return right
+        if left.version and not right.version:
             return left
-        if by_version < 0:
-            return right
-    if left.release_ts and right.release_ts:
-        if left.release_ts > right.release_ts:
-            return left
-        if right.release_ts > left.release_ts:
+        if right.version and not left.version:
             return right
     if left.backend == "apt":
         return left
@@ -193,12 +216,8 @@ def pick_winner(cluster: list[AppEntry]) -> AppEntry:
     copies = [winner, *winner.extras]
     winner.installed = any(copy.self_installed for copy in copies)
     winner.has_update = any(copy.self_installed and copy.self_has_update for copy in copies)
-    installed = [copy for copy in copies if copy.self_installed]
-    if installed:
-        native = next((copy for copy in installed if copy.backend == "apt"), None)
-        shown = native or installed[0]
-        if shown.version:
-            winner.version = shown.version
+    # Keep the winner's own version on the card face (#9). Do not overwrite with
+    # an older installed APT copy when Flatpak won on newer.
     return winner
 
 

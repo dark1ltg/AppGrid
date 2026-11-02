@@ -121,6 +121,14 @@ ApplicationWindow {
                 Layout.fillWidth: true
             }
             Button {
+                text: "Reload"
+                font.family: Fonts.sans
+                font.pixelSize: Fonts.button
+                font.weight: Fonts.medium
+                visible: !controller.busy && controller.supportedDistro
+                onClicked: controller.reload()
+            }
+            Button {
                 text: "Cancel"
                 font.family: Fonts.sans
                 font.pixelSize: Fonts.button
