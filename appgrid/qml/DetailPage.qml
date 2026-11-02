@@ -44,11 +44,8 @@ Page {
         font.pixelSize: Fonts.button
         font.weight: Fonts.medium
         Label {
-            text: {
-                var src = controller.selectedBackend === "flatpak" ? "Flatpak" : "APT"
-                return "Install " + src + " " + controller.selectedName
-                       + "? The older installed copy will stay until you Remove."
-            }
+            text: "Install a newer copy of " + controller.selectedName
+                  + "? The older one will stay until you Remove."
             wrapMode: Text.WordWrap
             width: 420
             font.family: Fonts.sans
