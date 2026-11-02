@@ -156,6 +156,7 @@ class ActionWorker(QThread):
             if self._action == "update-all":
                 completed = 0
                 failed: list[tuple[str, str]] = []
+                cancelled_note = ""
                 for name, plugin in self._registry.plugins.items():
                     if name == "flatpak" and not self._flatpak_enabled:
                         continue
@@ -163,6 +164,10 @@ class ActionWorker(QThread):
                         plugin.update_all()
                         completed += 1
                     except CancelledError:
+                        # APT (or earlier backend) finished; do not hard-fail the job (#5).
+                        if completed:
+                            cancelled_note = " Some updates were cancelled."
+                            break
                         raise
                     except Exception as exc:  # noqa: BLE001
                         failed.append((name, str(exc)))
@@ -174,9 +179,17 @@ class ActionWorker(QThread):
                     )
                 else:
                     message = "Package updates finished."
-                if failed:
+                if cancelled_note:
+                    message += cancelled_note
+                elif failed:
                     kinds = {item[0] for item in failed}
-                    if kinds == {"flatpak"}:
+                    cancelish = [
+                        msg for _, msg in failed if "cancel" in (msg or "").lower()
+                    ]
+                    # Prefer concrete partial-cancel text from Flatpak (#4).
+                    if cancelish:
+                        message += " " + cancelish[-1]
+                    elif kinds == {"flatpak"}:
                         message += " Flatpak updates could not be completed."
                     elif "flatpak" not in kinds:
                         message += " System package updates could not be completed."

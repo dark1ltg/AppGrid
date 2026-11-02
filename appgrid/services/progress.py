@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 
 _reporter: Callable[[str], None] | None = None
 _percent_reporter: Callable[[int], None] | None = None
+_last_percent: int | None = None
+_last_percent_at: float = 0.0
+# Keep the last real % briefly so chatty non-percent lines do not flicker (#8).
+_PERCENT_GRACE_S = 1.5
 
 # Prefer pkcon / flatpak / apt progress phrasing over arbitrary "N%" tokens (#15).
 # Avoid matching the fractional digit in values like "3.0%".
@@ -28,9 +33,11 @@ def set_reporter(
     percent_callback: Callable[[int], None] | None = None,
 ) -> None:
     """Wire status text and optional percent (-1 = unknown / indeterminate)."""
-    global _reporter, _percent_reporter
+    global _reporter, _percent_reporter, _last_percent, _last_percent_at
     _reporter = callback
     _percent_reporter = percent_callback
+    _last_percent = None
+    _last_percent_at = 0.0
 
 
 def extract_percent(message: str) -> int | None:
@@ -49,9 +56,12 @@ def extract_percent(message: str) -> int | None:
 
 def report_percent(value: int | None) -> None:
     """Publish percent. None or out-of-range clears to indeterminate (-1)."""
+    global _last_percent, _last_percent_at
     if _percent_reporter is None:
         return
     if value is None:
+        _last_percent = None
+        _last_percent_at = 0.0
         _percent_reporter(-1)
         return
     if 0 <= int(value) <= 100:
@@ -59,11 +69,24 @@ def report_percent(value: int | None) -> None:
 
 
 def report(message: str) -> None:
+    global _last_percent, _last_percent_at
     if _reporter is None or not message:
         return
     line = " ".join(message.split())
     if len(line) > 140:
         line = line[:137] + "…"
     _reporter(line)
-    # Always sync percent to the latest line so stale % does not stick (#5).
-    report_percent(extract_percent(line))
+    pct = extract_percent(line)
+    now = time.monotonic()
+    if pct is not None:
+        _last_percent = pct
+        _last_percent_at = now
+        report_percent(pct)
+        return
+    # Non-percent line: keep last % for a short grace window (#8), then clear (#5).
+    if _last_percent is not None and (now - _last_percent_at) < _PERCENT_GRACE_S:
+        report_percent(_last_percent)
+        return
+    _last_percent = None
+    _last_percent_at = 0.0
+    report_percent(None)

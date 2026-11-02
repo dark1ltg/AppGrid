@@ -145,6 +145,7 @@ def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
 
     Same-backend APT: Debian version compare.
     Cross-backend: prefer release_ts (Flatpak runtime-style versions mis-rank as Debian) (#8).
+    A present release_ts beats 0; if still tied, fall back to version compare (#2).
     A side with a version beats an empty version (#4).
     On a remaining tie, prefer native APT.
     """
@@ -162,15 +163,23 @@ def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
             if right.release_ts > left.release_ts:
                 return right
     else:
-        if left.release_ts and right.release_ts:
-            if left.release_ts > right.release_ts:
+        # Prefer a present timestamp over missing/0 (#2).
+        if left.release_ts or right.release_ts:
+            if left.release_ts and right.release_ts:
+                if left.release_ts > right.release_ts:
+                    return left
+                if right.release_ts > left.release_ts:
+                    return right
+            elif left.release_ts:
                 return left
-            if right.release_ts > left.release_ts:
+            else:
                 return right
-        if left.version and not right.version:
-            return left
-        if right.version and not left.version:
-            return right
+        if left.version or right.version:
+            by_version = _cmp_versions(left.version, right.version)
+            if by_version > 0:
+                return left
+            if by_version < 0:
+                return right
     if left.backend == "apt":
         return left
     if right.backend == "apt":

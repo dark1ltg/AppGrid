@@ -53,6 +53,7 @@ class AppController(QObject):
         self._catalog_worker: CatalogWorker | None = None
         self._reload_again = False
         self._reload_refresh = False
+        self._post_action_reload = False
         self._index_refresh_done = False
         self._index_refresh_pending = False
         if not self._supported:
@@ -180,7 +181,22 @@ class AppController(QObject):
 
     @Property(str, notify=selectionChanged)
     def selectedVersion(self) -> str:
-        return self._selected.version if self._selected else ""
+        """Winner version, or Installed/Available split when they differ (#7)."""
+        if not self._selected:
+            return ""
+        winner = self._selected
+        installed = self._installed_native_copies()
+        if installed and not winner.self_installed:
+            parts: list[str] = []
+            for copy in installed:
+                label = "Flatpak" if copy.backend == "flatpak" else "APT"
+                parts.append(f"{label} {copy.version or '—'}")
+            avail = "Flatpak" if winner.backend == "flatpak" else "APT"
+            return (
+                f"Installed: {', '.join(parts)} · "
+                f"Available: {avail} {winner.version or '—'}"
+            )
+        return winner.version or ""
 
     @Property(float, notify=selectionChanged)
     def selectedRating(self) -> float:
@@ -286,6 +302,15 @@ class AppController(QObject):
         return bool(self._selected and self.selectedPrimaryAction == "install")
 
     @Property(bool, notify=selectionChanged)
+    def selectedInstallOverCopy(self) -> bool:
+        """True when Install would add a newer source beside an older installed copy (#6)."""
+        return bool(
+            self._selected
+            and self.selectedPrimaryAction == "install"
+            and self._installed_native_copies()
+        )
+
+    @Property(bool, notify=selectionChanged)
     def selectedCanRemove(self) -> bool:
         return bool(self._installed_native_copies())
 
@@ -372,14 +397,20 @@ class AppController(QObject):
             return
         use_refresh = self._reload_refresh
         self._reload_refresh = False
+        keep_busy = self._post_action_reload
+        self._post_action_reload = False
         has_grid = bool(self._source.entries())
-        self._set_busy(not has_grid)
+        # Keep busy through post-action refresh so Cancel stays until catalog finishes (#3).
+        self._set_busy(True if keep_busy or not has_grid else False)
         self._set_progress_percent(-1)
         if use_refresh:
             self._set_status("Checking for updates…")
+        elif self._pending_status:
+            # Keep success/fail footer during refresh (#9).
+            pass
         elif has_grid:
             self._set_status("Refreshing apps…")
-        elif not self._pending_status:
+        else:
             self._set_status("Loading apps…")
         if self._filter in {"apt", "flatpak"}:
             self._filter = "all"
@@ -437,6 +468,8 @@ class AppController(QObject):
     def _on_catalog_fail(self, message: str) -> None:
         self._pending_status = None
         self._index_refresh_pending = False
+        # Catalog cancel never hits _on_ok/_on_fail; clear Cancelling… here (#1).
+        self._set_active_action("")
         self._set_status(message or "Could not load the app list")
         if not self._action_running():
             self._set_busy(False)
@@ -585,10 +618,13 @@ class AppController(QObject):
             except (TypeError, RuntimeError):
                 pass
         if not self._reload_again:
+            # Aborted deferred reload (e.g. stale callback): never leave Cancelling… (#1).
+            self._set_active_action("")
             if not self._catalog_running():
                 self._set_busy(False)
             return
         self._reload_again = False
+        self._post_action_reload = True
         self.reload()
 
     @Slot()
@@ -596,6 +632,12 @@ class AppController(QObject):
         if not self._busy:
             return
         jobs.request()
-        self._reload_again = False
-        self._set_active_action("cancelling")
+        # Only show Cancelling… while an action worker is alive (#1).
+        # Do not clear _reload_again: post-action refresh must still run after
+        # cancel in the deferred-reload gap (busy true, action already finished).
+        if self._action_running():
+            self._set_active_action("cancelling")
+            self._set_status("Cancelling…")
+            return
+        self._set_active_action("")
         self._set_status("Cancelling…")

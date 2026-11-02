@@ -35,6 +35,34 @@ Page {
         onAccepted: controller.removeSelected()
     }
 
+    Dialog {
+        id: installConfirm
+        title: "Install newer copy?"
+        modal: true
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        font.family: Fonts.sans
+        font.pixelSize: Fonts.button
+        font.weight: Fonts.medium
+        Label {
+            text: {
+                var src = controller.selectedBackend === "flatpak" ? "Flatpak" : "APT"
+                return "Install " + src + " " + controller.selectedName
+                       + "? The older installed copy will stay until you Remove."
+            }
+            wrapMode: Text.WordWrap
+            width: 420
+            font.family: Fonts.sans
+            font.pixelSize: Fonts.settings
+            font.weight: Fonts.regular
+        }
+        onOpened: {
+            var ok = standardButton(Dialog.Ok)
+            if (ok)
+                ok.text = "Install"
+        }
+        onAccepted: controller.installSelected()
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 24
@@ -209,6 +237,17 @@ Page {
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
+                Label {
+                    visible: controller.selectedVersion !== ""
+                    text: controller.selectedVersion
+                    color: "#9AA8BA"
+                    font.family: Fonts.sans
+                    font.pixelSize: Fonts.description
+                    font.weight: Fonts.regular
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
+                }
                 Button {
                     visible: controller.selectedPrimaryAction !== ""
                     text: controller.selectedPrimaryAction === "update" ? "Update" : "Install"
@@ -236,6 +275,8 @@ Page {
                     onClicked: {
                         if (controller.selectedPrimaryAction === "update")
                             controller.updateSelected()
+                        else if (controller.selectedInstallOverCopy)
+                            installConfirm.open()
                         else
                             controller.installSelected()
                     }

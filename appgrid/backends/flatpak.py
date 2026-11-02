@@ -118,28 +118,44 @@ class FlatpakBackend(PackageBackend):
     def remove(self, entry: AppEntry) -> None:
         scopes = entry.scopes or ["user", "system"]
         errors: list[str] = []
+        done = 0
         for scope in scopes:
             try:
                 self._run(["uninstall", "-y", f"--{scope}", entry.app_id])
+                done += 1
             except CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
-        if errors and len(errors) == len(scopes):
-            raise RuntimeError(errors[-1])
+        if done == 0:
+            raise RuntimeError(errors[-1] if errors else f"Could not remove {entry.app_id}")
+        # Partial scope success is not full success (#10).
+        if errors:
+            raise RuntimeError(
+                f"Could not fully remove {entry.app_id} "
+                f"({done}/{len(scopes)} scopes ok). {errors[-1]}"
+            )
 
     def update_one(self, entry: AppEntry) -> None:
         scopes = entry.scopes or ["user", "system"]
         errors: list[str] = []
+        done = 0
         for scope in scopes:
             try:
                 self._run(["update", "-y", f"--{scope}", entry.app_id])
+                done += 1
             except CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
-        if errors and len(errors) == len(scopes):
-            raise RuntimeError(errors[-1])
+        if done == 0:
+            raise RuntimeError(errors[-1] if errors else f"Could not update {entry.app_id}")
+        # Partial scope success is not full success (#10).
+        if errors:
+            raise RuntimeError(
+                f"Could not fully update {entry.app_id} "
+                f"({done}/{len(scopes)} scopes ok). {errors[-1]}"
+            )
 
     def update_all(self) -> None:
         # Per-app update walks user+system; update-all must too (#2).
@@ -150,9 +166,14 @@ class FlatpakBackend(PackageBackend):
                 self._run(["update", "-y", f"--{scope}"])
                 done += 1
             except CancelledError:
-                # Auth dismiss on one scope: keep updates already applied.
+                # Auth dismiss after a scope succeeded: surface partial, do not
+                # claim full success (#4).
                 if done:
-                    return
+                    raise RuntimeError(
+                        "User Flatpaks updated; system update cancelled."
+                        if scope == "system"
+                        else "Some Flatpak updates finished; remaining update cancelled."
+                    )
                 raise
             except Exception as exc:  # noqa: BLE001
                 errors.append(str(exc))
