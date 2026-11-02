@@ -127,7 +127,7 @@ def _accent_from_id(app_id: str) -> str:
     return palette[sum(ord(ch) for ch in app_id) % len(palette)]
 
 
-def _release_info(component) -> tuple[str, int]:
+def _releases(component) -> list:
     box = None
     if hasattr(component, "get_releases_plain"):
         try:
@@ -136,19 +136,23 @@ def _release_info(component) -> tuple[str, int]:
             box = None
     releases = []
     if box is None:
-        pass
-    elif hasattr(box, "get_size") and hasattr(box, "index_safe"):
+        return releases
+    if hasattr(box, "get_size") and hasattr(box, "index_safe"):
         for index in range(box.get_size()):
             item = box.index_safe(index)
             if item is not None:
                 releases.append(item)
-    else:
-        try:
-            releases = list(box)
-        except TypeError:
-            releases = []
+        return releases
+    try:
+        return list(box)
+    except TypeError:
+        return []
+
+
+def _best_release(component):
+    releases = _releases(component)
     if not releases:
-        return "", 0
+        return None
     best = None
     best_ts = -1
     for item in releases:
@@ -156,10 +160,117 @@ def _release_info(component) -> tuple[str, int]:
         if ts >= best_ts:
             best_ts = ts
             best = item
+    return best
+
+
+def _release_info(component) -> tuple[str, int]:
+    best = _best_release(component)
     if best is None:
         return "", 0
     version = best.get_version() if hasattr(best, "get_version") else ""
-    return version or "", int(best_ts if best_ts > 0 else 0)
+    ts = int(best.get_timestamp() or 0) if hasattr(best, "get_timestamp") else 0
+    return version or "", int(ts if ts > 0 else 0)
+
+
+def _project_license(component) -> str:
+    getter = getattr(component, "get_project_license", None)
+    if not callable(getter):
+        return ""
+    try:
+        raw = getter() or ""
+    except Exception:
+        return ""
+    return plain_text(raw).strip()
+
+
+def _homepage_url(component) -> str:
+    getter = getattr(component, "get_url", None)
+    if not callable(getter):
+        return ""
+    try:
+        import gi
+
+        gi.require_version("AppStream", "1.0")
+        from gi.repository import AppStream
+
+        raw = getter(AppStream.UrlKind.HOMEPAGE) or ""
+    except Exception:
+        return ""
+    url = (raw or "").strip()
+    if not url:
+        return ""
+    if not url.startswith(("http://", "https://")):
+        return ""
+    return url
+
+
+def _artifact_size(artifact) -> int:
+    """Best-effort download/installed size from an AppStream artifact."""
+    getter = getattr(artifact, "get_size", None)
+    if not callable(getter):
+        return 0
+    try:
+        import gi
+
+        gi.require_version("AppStream", "1.0")
+        from gi.repository import AppStream
+
+        for kind in (AppStream.SizeKind.DOWNLOAD, AppStream.SizeKind.INSTALLED):
+            try:
+                value = int(getter(kind) or 0)
+            except Exception:
+                value = 0
+            if value > 0:
+                return value
+    except Exception:
+        return 0
+    return 0
+
+
+def _download_size_bytes(component) -> int:
+    """Optional package size from the newest release's artifacts (often missing)."""
+    best = _best_release(component)
+    if best is None:
+        return 0
+    artifacts_fn = getattr(best, "get_artifacts", None)
+    if not callable(artifacts_fn):
+        # Older AppStream: release.get_size(kind)
+        size_fn = getattr(best, "get_size", None)
+        if callable(size_fn):
+            try:
+                import gi
+
+                gi.require_version("AppStream", "1.0")
+                from gi.repository import AppStream
+
+                for kind in (AppStream.SizeKind.DOWNLOAD, AppStream.SizeKind.INSTALLED):
+                    try:
+                        value = int(size_fn(kind) or 0)
+                    except Exception:
+                        value = 0
+                    if value > 0:
+                        return value
+            except Exception:
+                return 0
+        return 0
+    try:
+        artifacts = artifacts_fn() or []
+    except Exception:
+        return 0
+    try:
+        items = list(artifacts)
+    except TypeError:
+        items = []
+        if hasattr(artifacts, "get_size") and hasattr(artifacts, "index_safe"):
+            for index in range(artifacts.get_size()):
+                item = artifacts.index_safe(index)
+                if item is not None:
+                    items.append(item)
+    for artifact in items:
+        value = _artifact_size(artifact)
+        if value > 0:
+            return value
+    return 0
 
 
 def _desktop_ids(component) -> list[str]:
@@ -354,6 +465,9 @@ def _load_appstream_gi(backend: str) -> list[AppEntry]:
                 launch_id=app_id,
                 release_ts=release_ts,
                 desktop_ids=_desktop_ids(component),
+                license=_project_license(component),
+                homepage=_homepage_url(component),
+                size_bytes=_download_size_bytes(component),
             )
         )
     return entries

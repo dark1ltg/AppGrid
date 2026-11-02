@@ -198,6 +198,59 @@ class AppController(QObject):
             )
         return winner.version or ""
 
+    @Property(str, notify=selectionChanged)
+    def selectedFactVersion(self) -> str:
+        """Plain version for the optional facts bar (not the Installed/Available chrome)."""
+        return (self._selected.version or "") if self._selected else ""
+
+    @Property(str, notify=selectionChanged)
+    def selectedLicense(self) -> str:
+        return (self._selected.license or "").strip() if self._selected else ""
+
+    @Property(str, notify=selectionChanged)
+    def selectedHomepage(self) -> str:
+        return (self._selected.homepage or "").strip() if self._selected else ""
+
+    @Property(str, notify=selectionChanged)
+    def selectedHomepageHost(self) -> str:
+        url = self.selectedHomepage
+        if not url:
+            return ""
+        text = url
+        for prefix in ("https://", "http://"):
+            if text.startswith(prefix):
+                text = text[len(prefix) :]
+                break
+        return text.removesuffix("/")
+
+    @Property(str, notify=selectionChanged)
+    def selectedSizeLabel(self) -> str:
+        if not self._selected:
+            return ""
+        return self._format_size(int(self._selected.size_bytes or 0))
+
+    @Property(bool, notify=selectionChanged)
+    def selectedHasFacts(self) -> bool:
+        return bool(
+            self.selectedFactVersion
+            or self.selectedLicense
+            or self.selectedSizeLabel
+            or self.selectedHomepage
+        )
+
+    @staticmethod
+    def _format_size(nbytes: int) -> str:
+        if nbytes <= 0:
+            return ""
+        units = (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10))
+        for label, scale in units:
+            if nbytes >= scale:
+                value = nbytes / scale
+                if label == "KB" and value >= 10:
+                    return f"{value:.0f} {label}"
+                return f"{value:.1f} {label}"
+        return f"{nbytes} B"
+
     @Property(float, notify=selectionChanged)
     def selectedRating(self) -> float:
         return float(self._selected.rating) if self._selected else 0.0

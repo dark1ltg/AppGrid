@@ -35,6 +35,9 @@ class AppEntry:
     extras: list["AppEntry"] = field(default_factory=list)
     rating: float = 0.0
     developer: str = ""
+    license: str = ""
+    homepage: str = ""
+    size_bytes: int = 0
 
 
 class PackageBackend(ABC):
