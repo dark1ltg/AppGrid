@@ -74,7 +74,8 @@ Page {
                 Layout.preferredWidth: 520
                 Layout.fillHeight: true
                 Layout.fillWidth: false
-                spacing: 10
+                // Match page margins: even Back → image → facts (facts same width as screenshot).
+                spacing: 24
 
                 Button {
                     id: backButton
@@ -154,14 +155,192 @@ Page {
                     }
                 }
                 }
+
+                // Optional facts — same width as the screenshot, even gap above.
+                Rectangle {
+                    id: factsBar
+                    visible: controller.selectedHasFacts
+                    Layout.preferredWidth: 520
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 56
+                    Layout.alignment: Qt.AlignBottom
+                    radius: 12
+                    color: "#1A1F29"
+                    border.width: 1
+                    border.color: "#2A3344"
+
+                    RowLayout {
+                        id: factsRow
+                        anchors.fill: parent
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
+                        anchors.topMargin: 10
+                        anchors.bottomMargin: 10
+                        spacing: 12
+
+                        Item {
+                            id: versionFact
+                            visible: controller.selectedFactVersion !== ""
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            Column {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    width: parent.width
+                                    text: "Version"
+                                    color: "#7E8B9A"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.badge
+                                    font.weight: Fonts.medium
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: controller.selectedFactVersion
+                                    color: "#E8EDF4"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.description
+                                    font.weight: Fonts.medium
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: versionFact.visible && (licenseFact.visible || sizeFact.visible || websiteFact.visible)
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            color: "#2A3344"
+                        }
+
+                        Item {
+                            id: licenseFact
+                            visible: controller.selectedLicense !== ""
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            Column {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    width: parent.width
+                                    text: "License"
+                                    color: "#7E8B9A"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.badge
+                                    font.weight: Fonts.medium
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: controller.selectedLicense
+                                    color: "#E8EDF4"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.description
+                                    font.weight: Fonts.medium
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: licenseFact.visible && (sizeFact.visible || websiteFact.visible)
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            color: "#2A3344"
+                        }
+
+                        Item {
+                            id: sizeFact
+                            visible: controller.selectedSizeLabel !== ""
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            Column {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    width: parent.width
+                                    text: "Size"
+                                    color: "#7E8B9A"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.badge
+                                    font.weight: Fonts.medium
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: controller.selectedSizeLabel
+                                    color: "#E8EDF4"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.description
+                                    font.weight: Fonts.medium
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: sizeFact.visible && websiteFact.visible
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            color: "#2A3344"
+                        }
+
+                        Item {
+                            id: websiteFact
+                            visible: controller.selectedHomepage !== ""
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            Column {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    width: parent.width
+                                    text: "Website"
+                                    color: "#7E8B9A"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.badge
+                                    font.weight: Fonts.medium
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: controller.selectedHomepageHost
+                                    color: "#6FCFC6"
+                                    font.family: Fonts.sans
+                                    font.pixelSize: Fonts.description
+                                    font.weight: Fonts.medium
+                                    elide: Text.ElideRight
+                                    font.underline: websiteHover.containsMouse
+                                }
+                            }
+                            MouseArea {
+                                id: websiteHover
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                onClicked: Qt.openUrlExternally(controller.selectedHomepage)
+                            }
+                        }
+                    }
+                }
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumWidth: 360
-                spacing: 10
+                spacing: 24
 
+                // Match Back button + left-column spacing so the title lines up with the image.
                 Item {
                     Layout.preferredHeight: 36
                     Layout.fillWidth: true
@@ -315,174 +494,6 @@ Page {
                         font.family: Fonts.sans
                         font.pixelSize: Fonts.description
                         font.weight: Fonts.regular
-                    }
-                }
-            }
-        }
-
-        // Optional facts — only cells with real data are shown.
-        Rectangle {
-            id: factsBar
-            visible: controller.selectedHasFacts
-            Layout.fillWidth: true
-            Layout.preferredHeight: 58
-            radius: 12
-            color: "#1A1F29"
-            border.width: 1
-            border.color: "#2A3344"
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                anchors.topMargin: 10
-                anchors.bottomMargin: 10
-                spacing: 8
-
-                Item {
-                    id: versionFact
-                    visible: controller.selectedFactVersion !== ""
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        spacing: 2
-                        Text {
-                            text: "Version"
-                            color: "#7E8B9A"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.badge
-                            font.weight: Fonts.medium
-                        }
-                        Text {
-                            text: controller.selectedFactVersion
-                            color: "#E8EDF4"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.description
-                            font.weight: Fonts.medium
-                            elide: Text.ElideRight
-                            width: parent.width
-                        }
-                    }
-                }
-
-                Rectangle {
-                    visible: versionFact.visible && (licenseFact.visible || sizeFact.visible || websiteFact.visible)
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    Layout.topMargin: 4
-                    Layout.bottomMargin: 4
-                    color: "#2A3344"
-                }
-
-                Item {
-                    id: licenseFact
-                    visible: controller.selectedLicense !== ""
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        spacing: 2
-                        Text {
-                            text: "License"
-                            color: "#7E8B9A"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.badge
-                            font.weight: Fonts.medium
-                        }
-                        Text {
-                            text: controller.selectedLicense
-                            color: "#E8EDF4"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.description
-                            font.weight: Fonts.medium
-                            elide: Text.ElideRight
-                            width: parent.width
-                        }
-                    }
-                }
-
-                Rectangle {
-                    visible: licenseFact.visible && (sizeFact.visible || websiteFact.visible)
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    Layout.topMargin: 4
-                    Layout.bottomMargin: 4
-                    color: "#2A3344"
-                }
-
-                Item {
-                    id: sizeFact
-                    visible: controller.selectedSizeLabel !== ""
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        spacing: 2
-                        Text {
-                            text: "Size"
-                            color: "#7E8B9A"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.badge
-                            font.weight: Fonts.medium
-                        }
-                        Text {
-                            text: controller.selectedSizeLabel
-                            color: "#E8EDF4"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.description
-                            font.weight: Fonts.medium
-                            elide: Text.ElideRight
-                            width: parent.width
-                        }
-                    }
-                }
-
-                Rectangle {
-                    visible: sizeFact.visible && websiteFact.visible
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    Layout.topMargin: 4
-                    Layout.bottomMargin: 4
-                    color: "#2A3344"
-                }
-
-                Item {
-                    id: websiteFact
-                    visible: controller.selectedHomepage !== ""
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        spacing: 2
-                        Text {
-                            text: "Website"
-                            color: "#7E8B9A"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.badge
-                            font.weight: Fonts.medium
-                        }
-                        Text {
-                            text: controller.selectedHomepageHost
-                            color: "#6FCFC6"
-                            font.family: Fonts.sans
-                            font.pixelSize: Fonts.description
-                            font.weight: Fonts.medium
-                            elide: Text.ElideRight
-                            width: parent.width
-                            font.underline: websiteHover.containsMouse
-                        }
-                    }
-                    MouseArea {
-                        id: websiteHover
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: Qt.openUrlExternally(controller.selectedHomepage)
                     }
                 }
             }
