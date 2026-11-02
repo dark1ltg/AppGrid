@@ -181,27 +181,12 @@ class AppController(QObject):
 
     @Property(str, notify=selectionChanged)
     def selectedVersion(self) -> str:
-        """Winner version, or Installed/Available split when they differ (#7)."""
-        if not self._selected:
-            return ""
-        winner = self._selected
-        installed = self._installed_native_copies()
-        if installed and not winner.self_installed:
-            parts: list[str] = []
-            for copy in installed:
-                label = "Flatpak" if copy.backend == "flatpak" else "APT"
-                parts.append(f"{label} {copy.version or '—'}")
-            avail = "Flatpak" if winner.backend == "flatpak" else "APT"
-            return (
-                f"Installed: {', '.join(parts)} · "
-                f"Available: {avail} {winner.version or '—'}"
-            )
-        return winner.version or ""
+        return self._selected.version if self._selected else ""
 
     @Property(str, notify=selectionChanged)
     def selectedFactVersion(self) -> str:
-        """Plain version for the optional facts bar (not the Installed/Available chrome)."""
-        return (self._selected.version or "") if self._selected else ""
+        """Version for the optional facts bar (same as selectedVersion)."""
+        return self.selectedVersion
 
     @Property(str, notify=selectionChanged)
     def selectedLicense(self) -> str:

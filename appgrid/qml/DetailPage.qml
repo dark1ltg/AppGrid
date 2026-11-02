@@ -237,17 +237,6 @@ Page {
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
-                Label {
-                    visible: controller.selectedVersion !== ""
-                    text: controller.selectedVersion
-                    color: "#9AA8BA"
-                    font.family: Fonts.sans
-                    font.pixelSize: Fonts.description
-                    font.weight: Fonts.regular
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
                 Button {
                     visible: controller.selectedPrimaryAction !== ""
                     text: controller.selectedPrimaryAction === "update" ? "Update" : "Install"
