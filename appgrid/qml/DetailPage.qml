@@ -7,6 +7,7 @@ import "."
 Page {
     id: page
     signal back()
+    padding: 0
     background: Rectangle { color: "#12151C" }
 
     Dialog {
@@ -61,14 +62,22 @@ Page {
     }
 
     ColumnLayout {
+        id: detailLayout
         anchors.fill: parent
-        // Same inset above the strip (spacing) and below it (bottom margin).
-        anchors.margins: 24
-        spacing: 24
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
+        anchors.topMargin: 24
+        // Sit flush on the stack bottom so strip→window-bottom == footer height.
+        anchors.bottomMargin: 0
+        spacing: 0
+
+        // Match Main.qml footer height so screenshot→strip equals strip→window bottom.
+        readonly property int stripGap: 44
 
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.bottomMargin: detailLayout.stripGap
             spacing: 24
 
             ColumnLayout {
