@@ -67,11 +67,10 @@ Page {
         anchors.leftMargin: 24
         anchors.rightMargin: 24
         anchors.topMargin: 24
-        // Sit flush on the stack bottom so strip→window-bottom == footer height.
+        // Flush to stack bottom; gap above strip matches footer height below it.
         anchors.bottomMargin: 0
         spacing: 0
 
-        // Match Main.qml footer height so screenshot→strip equals strip→window bottom.
         readonly property int stripGap: 44
 
         RowLayout {
@@ -119,11 +118,16 @@ Page {
                 }
 
                 Rectangle {
+                    id: heroFrame
                     Layout.preferredWidth: 520
                     Layout.fillHeight: true
                     Layout.fillWidth: true
                     radius: 16
-                    color: controller.selectedAccent
+                    // Demo/AppStream shots often fade to transparent; don't let accent
+                    // show through as a thick band under the image.
+                    color: controller.selectedScreenshot !== "" ? "#1C2330" : controller.selectedAccent
+                    border.width: controller.selectedScreenshot !== "" ? 2 : 0
+                    border.color: controller.selectedAccent
                     clip: true
 
                 Image {
