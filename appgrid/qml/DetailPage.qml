@@ -67,11 +67,11 @@ Page {
         anchors.leftMargin: 24
         anchors.rightMargin: 24
         anchors.topMargin: 24
-        // Even empty gaps: screenshot → strip and strip → footer (not into the footer).
-        anchors.bottomMargin: detailLayout.stripGap
+        // Center strip between screenshot and window bottom (footer is 44px tall).
+        anchors.bottomMargin: 0
         spacing: 0
 
-        readonly property int stripGap: 24
+        readonly property int stripGap: 44
 
         RowLayout {
             Layout.fillWidth: true
