@@ -29,6 +29,9 @@ DEMO_APPS = [
         "version": "131.0",
         "developer": "Mozilla",
         "accent": "#E66000",
+        "license": "MPL-2.0",
+        "homepage": "https://www.mozilla.org/firefox/",
+        "size_bytes": 91645542,
     },
     {
         "app_id": "org.videolan.VLC",
@@ -42,6 +45,8 @@ DEMO_APPS = [
         "installed": True,
         "accent": "#FF6A00",
         "version": "3.0.18",
+        "license": "GPL-2.0-or-later",
+        "homepage": "https://www.videolan.org/vlc/",
     },
     {
         "app_id": "org.gimp.GIMP",
@@ -323,6 +328,9 @@ class DemoBackend(PackageBackend):
                 origin=item["origin"],
                 accent=item["accent"],
                 desktop_ids=list(item.get("desktop_ids") or []),
+                license=item.get("license", ""),
+                homepage=item.get("homepage", ""),
+                size_bytes=int(item.get("size_bytes") or 0),
             )
             entry.self_installed = bool(entry.installed)
             entry.self_has_update = bool(entry.has_update)

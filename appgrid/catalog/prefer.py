@@ -207,6 +207,12 @@ def _fold(winner: AppEntry, other: AppEntry) -> None:
         winner.version = other.version
     if not winner.developer:
         winner.developer = other.developer
+    if not winner.license:
+        winner.license = other.license
+    if not winner.homepage:
+        winner.homepage = other.homepage
+    if not winner.size_bytes and other.size_bytes:
+        winner.size_bytes = other.size_bytes
     if other.rating > winner.rating:
         winner.rating = other.rating
     winner.alt_backend = other.backend

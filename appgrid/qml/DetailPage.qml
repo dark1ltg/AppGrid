@@ -7,6 +7,7 @@ import "."
 Page {
     id: page
     signal back()
+    padding: 0
     background: Rectangle { color: "#12151C" }
 
     Dialog {
@@ -44,11 +45,8 @@ Page {
         font.pixelSize: Fonts.button
         font.weight: Fonts.medium
         Label {
-            text: {
-                var src = controller.selectedBackend === "flatpak" ? "Flatpak" : "APT"
-                return "Install " + src + " " + controller.selectedName
-                       + "? The older installed copy will stay until you Remove."
-            }
+            text: "Install a newer copy of " + controller.selectedName
+                  + "? The older one will stay until you Remove."
             wrapMode: Text.WordWrap
             width: 420
             font.family: Fonts.sans
@@ -64,13 +62,22 @@ Page {
     }
 
     ColumnLayout {
+        id: detailLayout
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
+        anchors.topMargin: 24
+        // Sit flush on the stack bottom so strip→window-bottom == footer height.
+        anchors.bottomMargin: 0
+        spacing: 0
+
+        // Match Main.qml footer height so screenshot→strip equals strip→window bottom.
+        readonly property int stripGap: 44
 
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.bottomMargin: detailLayout.stripGap
             spacing: 24
 
             ColumnLayout {
@@ -237,17 +244,6 @@ Page {
                     horizontalAlignment: Text.AlignHCenter
                     Layout.fillWidth: true
                 }
-                Label {
-                    visible: controller.selectedVersion !== ""
-                    text: controller.selectedVersion
-                    color: "#9AA8BA"
-                    font.family: Fonts.sans
-                    font.pixelSize: Fonts.description
-                    font.weight: Fonts.regular
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
                 Button {
                     visible: controller.selectedPrimaryAction !== ""
                     text: controller.selectedPrimaryAction === "update" ? "Update" : "Install"
@@ -329,6 +325,180 @@ Page {
                         font.family: Fonts.sans
                         font.pixelSize: Fonts.description
                         font.weight: Fonts.regular
+                    }
+                }
+            }
+        }
+
+        // Full-width facts strip; 24px above (spacing) matches 24px below (page margin).
+        Rectangle {
+            id: factsBar
+            visible: controller.selectedHasFacts
+            Layout.fillWidth: true
+            Layout.preferredHeight: 58
+            radius: 12
+            color: "#1A1F29"
+            border.width: 1
+            border.color: "#2A3344"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                anchors.topMargin: 10
+                anchors.bottomMargin: 10
+                spacing: 12
+
+                Item {
+                    id: versionFact
+                    visible: controller.selectedFactVersion !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: "Version"
+                            color: "#7E8B9A"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.badge
+                            font.weight: Fonts.medium
+                        }
+                        Text {
+                            width: parent.width
+                            text: controller.selectedFactVersion
+                            color: "#E8EDF4"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.description
+                            font.weight: Fonts.medium
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: versionFact.visible && (licenseFact.visible || sizeFact.visible || websiteFact.visible)
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    color: "#2A3344"
+                }
+
+                Item {
+                    id: licenseFact
+                    visible: controller.selectedLicense !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: "License"
+                            color: "#7E8B9A"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.badge
+                            font.weight: Fonts.medium
+                        }
+                        Text {
+                            width: parent.width
+                            text: controller.selectedLicense
+                            color: "#E8EDF4"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.description
+                            font.weight: Fonts.medium
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: licenseFact.visible && (sizeFact.visible || websiteFact.visible)
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    color: "#2A3344"
+                }
+
+                Item {
+                    id: sizeFact
+                    visible: controller.selectedSizeLabel !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: "Size"
+                            color: "#7E8B9A"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.badge
+                            font.weight: Fonts.medium
+                        }
+                        Text {
+                            width: parent.width
+                            text: controller.selectedSizeLabel
+                            color: "#E8EDF4"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.description
+                            font.weight: Fonts.medium
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: sizeFact.visible && websiteFact.visible
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    color: "#2A3344"
+                }
+
+                Item {
+                    id: websiteFact
+                    visible: controller.selectedHomepage !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    Column {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: "Website"
+                            color: "#7E8B9A"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.badge
+                            font.weight: Fonts.medium
+                        }
+                        Text {
+                            width: parent.width
+                            text: controller.selectedHomepageHost
+                            color: "#6FCFC6"
+                            font.family: Fonts.sans
+                            font.pixelSize: Fonts.description
+                            font.weight: Fonts.medium
+                            elide: Text.ElideRight
+                            font.underline: websiteHover.containsMouse
+                        }
+                    }
+                    MouseArea {
+                        id: websiteHover
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        hoverEnabled: true
+                        onClicked: Qt.openUrlExternally(controller.selectedHomepage)
                     }
                 }
             }
