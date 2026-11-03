@@ -67,11 +67,11 @@ Page {
         anchors.leftMargin: 24
         anchors.rightMargin: 24
         anchors.topMargin: 24
-        // Flush to stack bottom; gap above strip matches footer height below it.
-        anchors.bottomMargin: 0
+        // Even empty gaps: screenshot → strip and strip → footer (not into the footer).
+        anchors.bottomMargin: detailLayout.stripGap
         spacing: 0
 
-        readonly property int stripGap: 44
+        readonly property int stripGap: 24
 
         RowLayout {
             Layout.fillWidth: true
