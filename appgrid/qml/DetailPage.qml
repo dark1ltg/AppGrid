@@ -67,11 +67,11 @@ Page {
         anchors.leftMargin: 24
         anchors.rightMargin: 24
         anchors.topMargin: 24
-        // Center strip between screenshot and window bottom (footer is 44px tall).
-        anchors.bottomMargin: 0
+        // Equal empty gaps: screenshot → strip and strip → footer (not into the footer).
+        anchors.bottomMargin: detailLayout.stripGap
         spacing: 0
 
-        readonly property int stripGap: 44
+        readonly property int stripGap: 24
 
         RowLayout {
             Layout.fillWidth: true
@@ -334,7 +334,7 @@ Page {
             }
         }
 
-        // Full-width facts strip; 24px above (spacing) matches 24px below (page margin).
+        // Full-width facts strip; stripGap above matches stripGap below (to footer).
         Rectangle {
             id: factsBar
             visible: controller.selectedHasFacts
