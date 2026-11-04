@@ -90,18 +90,14 @@ class PackageKitFirstTests(unittest.TestCase):
 
         calls: list[str] = []
 
-        def fake_pkcon() -> str | None:
-            return "/usr/bin/pkcon"
-
-        def fake_helper() -> str | None:
-            return "/usr/bin/appgrid-apt-helper"
-
         def fake_run(argv, env=None):  # noqa: ANN001
             calls.append(" ".join(argv))
             return ""
 
-        with mock.patch.object(packagekit, "_pkcon", fake_pkcon):
-            with mock.patch.object(packagekit, "_helper", fake_helper):
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkcon", "pkcon")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
                 with mock.patch.object(packagekit, "_run", fake_run):
                     with mock.patch.object(packagekit.progress, "report"):
                         packagekit.refresh_and_upgrade_system()
@@ -117,12 +113,83 @@ class PackageKitFirstTests(unittest.TestCase):
         def fake_run_helper(action: str, packages: list[str]) -> None:
             helper_calls.append((action, packages))
 
-        with mock.patch.object(packagekit, "_pkcon", return_value=None):
+        with mock.patch.object(packagekit, "_packagekit_cli", return_value=None):
             with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
                 with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
                     with mock.patch.object(packagekit.progress, "report"):
                         packagekit.refresh_and_upgrade_system()
         self.assertEqual(helper_calls, [("refresh-upgrade", [])])
+
+    def test_prefers_pkgcli_over_pkcon(self) -> None:
+        from appgrid.services import packagekit
+
+        def isfile(path: str) -> bool:
+            return path in {"/usr/bin/pkgcli", "/usr/bin/pkcon"}
+
+        with mock.patch.object(packagekit.shutil, "which", return_value=None):
+            with mock.patch.object(packagekit.os.path, "isfile", side_effect=isfile):
+                with mock.patch.object(packagekit.os, "access", return_value=True):
+                    found = packagekit._packagekit_cli()
+        self.assertEqual(found, ("/usr/bin/pkgcli", "pkgcli"))
+
+    def test_pkcon_exit_5_with_packages_is_error(self) -> None:
+        from appgrid.services import packagekit
+
+        with mock.patch.object(
+            packagekit, "run_streaming", return_value=(5, "Transaction failed: nothing useful to do")
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
+        self.assertIn("nothing useful", str(ctx.exception))
+
+    def test_pkcon_exit_5_empty_install_surfaces_exit_code(self) -> None:
+        from appgrid.services import packagekit
+
+        with mock.patch.object(packagekit, "run_streaming", return_value=(5, "")):
+            with self.assertRaises(RuntimeError) as ctx:
+                packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
+        self.assertIn("exit 5", str(ctx.exception))
+
+    def test_pkcon_exit_5_refresh_noop_ok(self) -> None:
+        from appgrid.services import packagekit
+
+        with mock.patch.object(
+            packagekit, "run_streaming", return_value=(5, "Nothing useful to do.")
+        ):
+            out = packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "refresh"])
+        self.assertIn("Nothing useful", out)
+
+    def test_auth_cancel_message(self) -> None:
+        from appgrid.services import packagekit
+        from appgrid.services.jobs import CancelledError
+
+        with mock.patch.object(
+            packagekit, "run_streaming", return_value=(1, "Error: The authentication was dismissed.")
+        ):
+            with self.assertRaises(CancelledError) as ctx:
+                packagekit._run(["/usr/bin/pkgcli", "--yes", "install", "hello"])
+        self.assertIn("permission", str(ctx.exception).lower())
+
+
+class StickyStatusTests(unittest.TestCase):
+    def test_post_action_reload_does_not_clear_via_reload(self) -> None:
+        """Post-action refresh must call _reload(False), not reload() (clears sticky)."""
+        import inspect
+
+        from appgrid.controller import AppController
+
+        src = inspect.getsource(AppController._reload_after_action)
+        self.assertIn("self._reload(False)", src)
+        self.assertNotIn("self.reload()", src)
+
+    def test_apply_catalog_keeps_pending_status(self) -> None:
+        import inspect
+
+        from appgrid.controller import AppController
+
+        src = inspect.getsource(AppController._apply_catalog)
+        self.assertIn("self._pending_status", src)
+        self.assertNotIn("self._pending_status = None", src)
 
 
 if __name__ == "__main__":

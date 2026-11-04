@@ -23,45 +23,65 @@ def _looks_cancelled(output: str) -> bool:
     return any(token in text for token in _CANCEL_TEXT)
 
 
+def _pk_verb_and_packages(argv: list[str]) -> tuple[str, list[str]]:
+    """Strip flags from pkcon/pkgcli argv → (verb, packages)."""
+    positional = [a for a in argv[1:] if a and not a.startswith("-")]
+    if not positional:
+        return "", []
+    return positional[0], positional[1:]
+
+
+def _fail_message(output: str, code: int, fallback: str) -> str:
+    text = (output or "").strip()
+    if text:
+        return text
+    return f"{fallback} (exit {code})"
+
+
 def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     code, output = run_streaming(argv, env=env)
     name = os.path.basename(argv[0]) if argv else ""
     if name in {"pkcon", "pkgcli"}:
         if code == 0:
             return output
-        # pkcon: 5 = nothing useful / cancel on some versions.
+        if _looks_cancelled(output):
+            raise CancelledError("Cancelled — administrator permission was not granted.")
+        verb, packages = _pk_verb_and_packages(argv)
+        mutating = verb in {"install", "remove", "update", "upgrade"}
+        # pkcon: 5 = nothing useful / cancel on some versions. Never treat that as
+        # success for install/remove/update when packages were named (Kubuntu silent fail).
         if name == "pkcon" and code == 5:
-            if _looks_cancelled(output):
-                raise CancelledError("Cancelled.")
             lowered = output.lower()
             if any(
                 token in lowered
                 for token in ("not found", "couldn't find", "could not find", "no such package")
             ):
-                raise RuntimeError(output or "Package not found")
+                raise RuntimeError(_fail_message(output, code, "Package not found"))
+            if mutating and packages:
+                raise RuntimeError(
+                    _fail_message(output, code, f"PackageKit could not {verb} the package")
+                )
             if output and any(token in lowered for token in _NOOP_TEXT):
                 return output
-            if argv and argv[-1] in {"refresh", "update"}:
+            if verb in {"refresh", "update", "upgrade"} and not packages:
                 return output
             # pkcon --plain -y <verb>  (no extra packages)
-            if len(argv) <= 4:
+            if not packages:
                 return output
-            raise RuntimeError(output or "PackageKit failed")
-        if _looks_cancelled(output):
-            raise CancelledError("Cancelled.")
-        raise RuntimeError(output or "PackageKit failed")
+            raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
+        raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
     if code != 0:
         if _looks_cancelled(output):
-            raise CancelledError("Cancelled.")
-        raise RuntimeError(output or f"command failed: {' '.join(argv)}")
+            raise CancelledError("Cancelled — administrator permission was not granted.")
+        raise RuntimeError(_fail_message(output, code, f"command failed: {' '.join(argv)}"))
     return output
 
 
 def _packagekit_cli() -> tuple[str, str] | None:
-    """Return (path, kind) for PackageKit CLI: pkcon (older) or pkgcli (1.4+/Sid)."""
+    """Return (path, kind): prefer pkgcli (PackageKit 1.4+/Ubuntu 26.04), else pkcon."""
     for kind, candidates in (
-        ("pkcon", ("pkcon", "/usr/bin/pkcon")),
         ("pkgcli", ("pkgcli", "/usr/bin/pkgcli")),
+        ("pkcon", ("pkcon", "/usr/bin/pkcon")),
     ):
         for candidate in candidates:
             if candidate.startswith("/"):

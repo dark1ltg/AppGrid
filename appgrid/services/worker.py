@@ -36,12 +36,16 @@ class CatalogWorker(QThread):
         flatpak_enabled: bool = False,
         merge_duplicates: bool = True,
         refresh_indexes: bool = False,
+        skip_snapshot: bool = False,
     ) -> None:
         super().__init__()
         self._registry = registry
         self._flatpak_enabled = flatpak_enabled
         self._merge_duplicates = merge_duplicates
         self._refresh_indexes = refresh_indexes
+        # Post-action reloads must not emit a stale snapshot first: that apply
+        # used to clear the Install/fail footer before the real catalog arrived.
+        self._skip_snapshot = skip_snapshot
 
     def run(self) -> None:
         progress.set_reporter(self.progress.emit, self.progressPercent.emit)
@@ -56,7 +60,11 @@ class CatalogWorker(QThread):
                 except Exception as exc:  # noqa: BLE001
                     progress.report(str(exc) or "Could not check for updates")
                     self.indexesRefreshed.emit(False)
-            if not self._registry.demo and not self._refresh_indexes:
+            if (
+                not self._registry.demo
+                and not self._refresh_indexes
+                and not self._skip_snapshot
+            ):
                 cached = load_snapshot(self._flatpak_enabled)
                 if cached:
                     self.loaded.emit(

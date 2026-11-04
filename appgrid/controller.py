@@ -418,6 +418,7 @@ class AppController(QObject):
 
     @Slot()
     def reload(self) -> None:
+        self._pending_status = None
         self._reload(False)
 
     def _reload(self, refresh_indexes: bool) -> None:
@@ -458,10 +459,13 @@ class AppController(QObject):
             flatpak_enabled=self.flatpakEnabled,
             merge_duplicates=self._merge_duplicates,
             refresh_indexes=use_refresh,
+            skip_snapshot=keep_busy,
         )
         worker.loaded.connect(self._on_catalog)
         worker.failed.connect(self._on_catalog_fail)
-        worker.progress.connect(self._set_status)
+        # Don't let catalog chatter wipe a sticky Install/fail message.
+        if not self._pending_status:
+            worker.progress.connect(self._set_status)
         worker.progressPercent.connect(self._set_progress_percent)
         worker.indexesRefreshed.connect(self._on_indexes_refreshed)
         worker.finished.connect(worker.deleteLater)
@@ -488,10 +492,12 @@ class AppController(QObject):
         if selected_uid or app_id or name:
             self._selected = self._model.resolve(selected_uid, app_id, name)
         counts = self._model.counts()
+        # Keep Install/fail/success text sticky across snapshot+full catalog emits.
+        # Clearing here made Kubuntu installs look like a silent no-op: fail → brief
+        # footer → second catalog apply replaced it with "N apps · …".
         status = self._pending_status or (
             f"{counts['all']} apps · {counts['installed']} installed · {counts['updates']} updates"
         )
-        self._pending_status = None
         self._set_status(status)
         if not self._action_running():
             self._set_busy(False)
@@ -504,11 +510,12 @@ class AppController(QObject):
             self._index_refresh_done = True
 
     def _on_catalog_fail(self, message: str) -> None:
-        self._pending_status = None
         self._index_refresh_pending = False
         # Catalog cancel never hits _on_ok/_on_fail; clear Cancelling… here (#1).
         self._set_active_action("")
-        self._set_status(message or "Could not load the app list")
+        # Prefer a pending action error over a generic catalog-cancel wipe.
+        text = self._pending_status or message or "Could not load the app list"
+        self._set_status(text)
         if not self._action_running():
             self._set_busy(False)
         self.catalogChanged.emit()
@@ -598,6 +605,7 @@ class AppController(QObject):
                 "remove": f"Removing {entry.name}…",
                 "update": f"Updating {entry.name}…",
             }[action]
+        self._pending_status = None
         self._set_active_action(action)
         self._set_busy(True)
         self._set_progress_percent(-1)
@@ -663,7 +671,8 @@ class AppController(QObject):
             return
         self._reload_again = False
         self._post_action_reload = True
-        self.reload()
+        # Keep sticky Install/fail text: do not call reload() which clears it.
+        self._reload(False)
 
     @Slot()
     def cancelJob(self) -> None:
