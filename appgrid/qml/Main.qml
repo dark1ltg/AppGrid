@@ -106,8 +106,20 @@ ApplicationWindow {
     }
 
     footer: ToolBar {
-        Material.background: "#151A22"
+        id: statusBar
         height: 44
+        // Explicit fill — Material.background alone blends into the page and
+        // hides the strip→footer gap the facts bar is meant to match.
+        background: Rectangle {
+            color: "#151A22"
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 1
+                color: "#2A3344"
+            }
+        }
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 16

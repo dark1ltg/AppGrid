@@ -6,6 +6,8 @@ import signal
 import subprocess
 import sys
 
+# Package-name allowlist shared with PolicyKit helper callers (#6).
+# Refuse shell metacharacters, paths, and anything outside Debian package syntax.
 _SAFE = re.compile(r"^[A-Za-z0-9.+:~_-]+$")
 _ACTIONS = {"install", "remove", "upgrade", "refresh", "refresh-upgrade"}
 _apt_proc: subprocess.Popen | None = None
@@ -30,10 +32,20 @@ def same_release_upgrade_args(binary: str) -> list[str]:
     return ["upgrade", "-y"]
 
 
-def _check_packages(names: list[str]) -> None:
+def is_safe_package_name(name: str) -> bool:
+    """True when *name* matches the helper/PolicyKit package-name allowlist."""
+    return bool(name) and bool(_SAFE.match(name))
+
+
+def check_packages(names: list[str]) -> None:
+    """Refuse any package name outside the allowlist (raises SystemExit)."""
     for name in names:
-        if not _SAFE.match(name):
+        if not is_safe_package_name(name):
             raise SystemExit(f"refusing unsafe package name: {name!r}")
+
+
+def _check_packages(names: list[str]) -> None:
+    check_packages(names)
 
 
 def _stop_apt(_signum=None, _frame=None) -> None:

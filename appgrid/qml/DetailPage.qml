@@ -67,12 +67,11 @@ Page {
         anchors.leftMargin: 24
         anchors.rightMargin: 24
         anchors.topMargin: 24
-        // Sit flush on the stack bottom so strip→window-bottom == footer height.
-        anchors.bottomMargin: 0
+        // Equal empty gaps: screenshot → strip and strip → footer (not into the footer).
+        anchors.bottomMargin: detailLayout.stripGap
         spacing: 0
 
-        // Match Main.qml footer height so screenshot→strip equals strip→window bottom.
-        readonly property int stripGap: 44
+        readonly property int stripGap: 24
 
         RowLayout {
             Layout.fillWidth: true
@@ -119,11 +118,16 @@ Page {
                 }
 
                 Rectangle {
+                    id: heroFrame
                     Layout.preferredWidth: 520
                     Layout.fillHeight: true
                     Layout.fillWidth: true
                     radius: 16
-                    color: controller.selectedAccent
+                    // Demo/AppStream shots often fade to transparent; don't let accent
+                    // show through as a thick band under the image.
+                    color: controller.selectedScreenshot !== "" ? "#1C2330" : controller.selectedAccent
+                    border.width: controller.selectedScreenshot !== "" ? 2 : 0
+                    border.color: controller.selectedAccent
                     clip: true
 
                 Image {
@@ -330,7 +334,7 @@ Page {
             }
         }
 
-        // Full-width facts strip; 24px above (spacing) matches 24px below (page margin).
+        // Full-width facts strip; stripGap above matches stripGap below (to footer).
         Rectangle {
             id: factsBar
             visible: controller.selectedHasFacts

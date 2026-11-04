@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import os
-import re
 import shutil
 
+from appgrid.helpers.apt_helper import is_safe_package_name
 from appgrid.services import progress
 from appgrid.services.jobs import CancelledError, run_streaming
 
-_SAFE = re.compile(r"^[A-Za-z0-9.+:~_-]+$")
 _CANCEL_TEXT = ("dismissed", "not authorized", "cancelled", "canceled")
 _NOOP_TEXT = ("nothing useful", "no updates", "already", "no packages")
 
 
 def _check_name(name: str) -> str:
     package = (name or "").strip()
-    if not _SAFE.match(package):
+    if not is_safe_package_name(package):
         raise RuntimeError(f"refusing unsafe package name: {package!r}")
     return package
 
@@ -179,15 +178,16 @@ def refresh_package_indexes() -> None:
 def refresh_and_upgrade_system() -> None:
     """Refresh indexes, then upgrade packages on this Ubuntu/Debian release only.
 
+    PackageKit first; privileged helper is fallback only (#6).
     Does not run do-release-upgrade or move 24.04 → 26.04.
     """
     progress.report("Updating installed packages and libraries…")
-    if _helper():
-        _run_helper("refresh-upgrade", [])
-        return
     if _pkcon():
         pkcon = _pkcon()
         _run([pkcon, "--plain", "-y", "--cache-age", "0", "update"])
+        return
+    if _helper():
+        _run_helper("refresh-upgrade", [])
         return
     from appgrid.helpers.apt_helper import apt_bin, same_release_upgrade_args
 
