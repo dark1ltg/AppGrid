@@ -1,35 +1,36 @@
 # AppGrid
 
-A lightweight Qt 6 software store built around one job: **find → decide → install**. Browse desktop apps as a screenshot grid, pick one, and install it from the sources you already use.
+AppGrid is a lightweight Qt 6 software store for Debian-family desktops. Its job is simple: help you **find an app, decide it’s the one you want, and install it** — without turning into another full desktop “Software” app.
+
+You browse desktop applications as a **screenshot grid**. Each tile shows a real AppStream screenshot when one exists (with icon fallback), a short summary, and a star rating when ODRS data is available. Open a card for more detail, then install, remove, or update from there. System-wide updates are one click too.
 
 ![AppGrid screenshot grid](docs/ui-grid.png)
 
 ![App detail page](docs/ui-detail.png)
 
-## Why it exists
+## Why AppGrid exists
 
-- Full desktop stores (GNOME Software, Discover, Ubuntu App Center) are heavy, slow to scan, or snap-first.
-- Power-user tools (`apt`, Synaptic, Flathub browsers) are fast but not visual — hard to *see* an app before you install it.
-- AppGrid sits in between: a **fast visual grid** over APT (and optional Flatpak), without trying to be a full DE software center.
+Most Linux software UIs fall into two camps. Distro stores (GNOME Software, KDE Discover, Ubuntu App Center) try to be complete desktop centers — useful, but often heavy, slow on first load, or steered toward snaps and curated catalogs. On the other side, `apt`, Synaptic, and Flathub websites are powerful if you already know what you’re looking for, but they don’t make it easy to *see* apps the way people shop for them.
 
-This is a new take on the old App Grid idea (screenshot tiles from your existing sources). It is not a clone of the old Launchpad PPA project.
+AppGrid is the middle path: a **fast visual store over the packages you already trust**. APT is the default path. Flatpak (Flathub) is optional and off until you enable it in Settings. When both are on, the same app still appears as **one card** — AppGrid picks the newer build and keeps backend labels out of the UI so you’re choosing an app, not a packaging format.
+
+It’s a new implementation of the old App Grid idea (screenshot tiles from existing sources), not a revival of the Launchpad PPA codebase, and not an attempt at DE chrome parity. The product bet is browse-and-install speed, not matching every GNOME or KDE Software feature.
 
 ## Who it’s for
 
-- People on **Ubuntu 24.04 LTS**, **Debian 12**, and relatives (**Linux Mint 22**, elementary OS 8, Pop!_OS 24.04, Zorin when 24.04-based, and similar)
-- Users who want **native `.deb` / APT first**, with Flatpak available only if they turn it on
-- Anyone who prefers browsing apps by screenshot instead of package names
+AppGrid is for people on **Ubuntu 24.04 LTS**, **Debian 12**, and closely related systems — **Linux Mint 22**, elementary OS 8, Pop!_OS 24.04, Zorin when it’s 24.04-based, and similar. If your day-to-day install path is `.deb` / APT and you sometimes want Flathub without living in a Flatpak-only browser, this is aimed at you.
 
-**Not for:** Arch, CachyOS, Fedora, or other non-Debian-family distros.
+It’s especially useful if you prefer deciding from screenshots and short descriptions rather than package names, and if you want a store that stays out of the way once the app is installed.
 
-## Highlights
+It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are rejected up front rather than half-supported.
 
-- Screenshot-first grid with star ratings (ODRS when available)
-- Search, categories, and Installed / Updates filters
+## What you get
+
+- Screenshot-first grid, search, categories, and Installed / Updates views
 - Install, remove, per-app update, and **Update all**
-- APT via PackageKit (normal admin password prompt); Flatpak from Flathub when enabled
-- **One card per app** when Flatpak is on — newer source wins; source labels stay out of the UI
-- Small online `.deb`, plus an offline Setup `.deb` that vendors Qt for double-click install on 24.04 / Mint 22 amd64
+- APT through PackageKit (normal administrator password prompt), with a narrow PolicyKit helper as fallback
+- Optional Flatpak from Flathub; one merged card per app when enabled
+- A small online `.deb`, plus an offline Setup `.deb` that vendors Qt for double-click install on Ubuntu 24.04 / Mint 22 amd64
 
 ## Install the .deb
 
