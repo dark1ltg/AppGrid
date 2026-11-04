@@ -234,30 +234,29 @@ def extract_deb(path: Path, dest: Path) -> None:
         shutil.rmtree(staging, ignore_errors=True)
 
 
-WRAPPER = r"""#!/usr/bin/python3
-import os
-import sys
+# Shell wrapper so LD_LIBRARY_PATH / PYTHONPATH are set *before* Python starts.
+# Setting those in a running Python process does not put vendored PyQt6 on sys.path
+# and does not reconfigure the dynamic linker — the BlankOn/clean-host failure mode.
+WRAPPER = r"""#!/bin/sh
+ROOT=/opt/appgrid
+LIB="$ROOT/usr/lib/x86_64-linux-gnu"
+PY="$ROOT/usr/lib/python3/dist-packages"
+QML="$LIB/qt6/qml"
+PLUGINS="$LIB/qt6/plugins"
+GI="$LIB/girepository-1.0"
+BIN="$ROOT/usr/bin"
 
-ROOT = "/opt/appgrid"
-LIB = ROOT + "/usr/lib/x86_64-linux-gnu"
-PY = ROOT + "/usr/lib/python3/dist-packages"
-QML = LIB + "/qt6/qml"
-PLUGINS = LIB + "/qt6/plugins"
-GI = LIB + "/girepository-1.0"
-BIN = ROOT + "/usr/bin"
+export LD_LIBRARY_PATH="$LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PYTHONPATH="$PY${PYTHONPATH:+:$PYTHONPATH}"
+export QML2_IMPORT_PATH="$QML${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+export QT_PLUGIN_PATH="$PLUGINS"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$PLUGINS/platforms"
+if [ -d "$GI" ]; then
+  export GI_TYPELIB_PATH="$GI${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+fi
+export PATH="$BIN:${PATH:-/usr/bin}"
 
-os.environ["LD_LIBRARY_PATH"] = LIB + ((":" + os.environ["LD_LIBRARY_PATH"]) if os.environ.get("LD_LIBRARY_PATH") else "")
-os.environ["PYTHONPATH"] = PY + ((":" + os.environ["PYTHONPATH"]) if os.environ.get("PYTHONPATH") else "")
-os.environ["QML2_IMPORT_PATH"] = QML + ((":" + os.environ["QML2_IMPORT_PATH"]) if os.environ.get("QML2_IMPORT_PATH") else "")
-os.environ["QT_PLUGIN_PATH"] = PLUGINS
-os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = PLUGINS + "/platforms"
-if os.path.isdir(GI):
-    os.environ["GI_TYPELIB_PATH"] = GI + ((":" + os.environ["GI_TYPELIB_PATH"]) if os.environ.get("GI_TYPELIB_PATH") else "")
-os.environ["PATH"] = BIN + ":" + os.environ.get("PATH", "/usr/bin")
-
-from appgrid.__main__ import main
-
-raise SystemExit(main())
+exec /usr/bin/python3 -m appgrid "$@"
 """
 
 
