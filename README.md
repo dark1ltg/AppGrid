@@ -1,23 +1,35 @@
 # AppGrid
 
-Lightweight Qt 6 software store for **Ubuntu 24.04 LTS**, **Debian 12**, and distributions based on those (Linux Mint 22, elementary OS 8, Pop!_OS 24.04, Zorin when 24.04-based, and similar). It is **not** for Arch, CachyOS, Fedora, or other unrelated families.
-
-v1 covers a screenshot grid with star ratings, search, install/remove, updates, Ubuntu/Debian APT, and an optional Flatpak backend.
-
-This is a new implementation of the App Grid idea (fast grid of apps from your existing sources). It is not a copy of the old Launchpad PPA sources.
+A lightweight Qt 6 software store built around one job: **find → decide → install**. Browse desktop apps as a screenshot grid, pick one, and install it from the sources you already use.
 
 ![AppGrid screenshot grid](docs/ui-grid.png)
 
 ![App detail page](docs/ui-detail.png)
 
-## Features
+## Why it exists
 
-- Grid of desktop applications: AppStream screenshot on the tile, star average, icon if no screenshot
-- Search by name, summary, or package id
-- Filters: All, Installed, Updates, and categories (Arts, Games, Productivity, Programming, Sciences, Internet, System)
-- Settings: **Enable Flatpak** (off by default). The same app is never shown twice; AppGrid keeps one card and installs the newer of APT or Flatpak.
-- Install, remove, per-app update, and **Update all** for the whole system. Ubuntu apps go through **PackageKit** (`pkcon`) so the normal administrator password window appears. Flatpak uses its own prompt when needed.
-- AppStream metadata when present. `--demo` is only for screenshots and development, not a supported OS.
+- Full desktop stores (GNOME Software, Discover, Ubuntu App Center) are heavy, slow to scan, or snap-first.
+- Power-user tools (`apt`, Synaptic, Flathub browsers) are fast but not visual — hard to *see* an app before you install it.
+- AppGrid sits in between: a **fast visual grid** over APT (and optional Flatpak), without trying to be a full DE software center.
+
+This is a new take on the old App Grid idea (screenshot tiles from your existing sources). It is not a clone of the old Launchpad PPA project.
+
+## Who it’s for
+
+- People on **Ubuntu 24.04 LTS**, **Debian 12**, and relatives (**Linux Mint 22**, elementary OS 8, Pop!_OS 24.04, Zorin when 24.04-based, and similar)
+- Users who want **native `.deb` / APT first**, with Flatpak available only if they turn it on
+- Anyone who prefers browsing apps by screenshot instead of package names
+
+**Not for:** Arch, CachyOS, Fedora, or other non-Debian-family distros.
+
+## Highlights
+
+- Screenshot-first grid with star ratings (ODRS when available)
+- Search, categories, and Installed / Updates filters
+- Install, remove, per-app update, and **Update all**
+- APT via PackageKit (normal admin password prompt); Flatpak from Flathub when enabled
+- **One card per app** when Flatpak is on — newer source wins; source labels stay out of the UI
+- Small online `.deb`, plus an offline Setup `.deb` that vendors Qt for double-click install on 24.04 / Mint 22 amd64
 
 ## Install the .deb
 
