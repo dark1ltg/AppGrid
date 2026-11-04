@@ -6,6 +6,10 @@ v1 covers a screenshot grid with star ratings, search, install/remove, updates, 
 
 This is a new implementation of the App Grid idea (fast grid of apps from your existing sources). It is not a copy of the old Launchpad PPA sources.
 
+![AppGrid screenshot grid](docs/ui-grid.png)
+
+![App detail page](docs/ui-detail.png)
+
 ## Features
 
 - Grid of desktop applications: AppStream screenshot on the tile, star average, icon if no screenshot
