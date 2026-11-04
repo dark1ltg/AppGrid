@@ -192,5 +192,41 @@ class StickyStatusTests(unittest.TestCase):
         self.assertNotIn("self._pending_status = None", src)
 
 
+class PolkitSessionTests(unittest.TestCase):
+    def test_popen_does_not_start_new_session(self) -> None:
+        """setsid/start_new_session breaks polkit password dialogs."""
+        import inspect
+
+        from appgrid.services import jobs
+
+        src = inspect.getsource(jobs._popen)
+        self.assertIn("start_new_session=False", src)
+        self.assertIn("preexec_fn", src)
+        self.assertNotIn("start_new_session=True", src)
+
+    def test_auth_failure_falls_back_to_helper(self) -> None:
+        from appgrid.services import packagekit
+
+        helper_calls: list[tuple] = []
+
+        def fake_run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+            raise RuntimeError("Failed to obtain authorization")
+
+        def fake_run_helper(action: str, packages: list[str]) -> None:
+            helper_calls.append((action, list(packages)))
+
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkgcli", "pkgcli")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
+                with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
+                    with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
+                        with mock.patch.object(packagekit.progress, "report"):
+                            packagekit._one_auth_path(
+                                "install", ["hello"], "install", ["install", "-y", "hello"]
+                            )
+        self.assertEqual(helper_calls, [("install", ["hello"])])
+
+
 if __name__ == "__main__":
     unittest.main()

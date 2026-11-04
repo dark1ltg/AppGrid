@@ -109,6 +109,16 @@ def request() -> None:
                 pass
 
 
+def _new_process_group() -> None:
+    """Put the child in its own process group so Cancel can killpg().
+
+    Do **not** use setsid()/start_new_session: that leaves the logind/polkit
+    session, so PackageKit/pkexec fail with “Failed to obtain authorization”
+    and never show a password dialog (seen on Kubuntu 26.04).
+    """
+    os.setpgrp()
+
+
 def _popen(argv: list[str], env: dict[str, str] | None, *, capture_err: bool) -> subprocess.Popen:
     stderr = subprocess.PIPE if capture_err else subprocess.STDOUT
     return subprocess.Popen(
@@ -118,7 +128,8 @@ def _popen(argv: list[str], env: dict[str, str] | None, *, capture_err: bool) ->
         text=True,
         env=env,
         stdin=subprocess.DEVNULL,
-        start_new_session=True,
+        start_new_session=False,
+        preexec_fn=_new_process_group,
     )
 
 

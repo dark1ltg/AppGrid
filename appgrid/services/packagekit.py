@@ -38,14 +38,42 @@ def _fail_message(output: str, code: int, fallback: str) -> str:
     return f"{fallback} (exit {code})"
 
 
+def _looks_auth_failure(output: str) -> bool:
+    text = (output or "").lower()
+    return any(
+        token in text
+        for token in (
+            "failed to obtain authorization",
+            "failed to obtain authentication",
+            "not authorized",
+            "authorization failed",
+            "authentication failed",
+            "no session for cookie",
+        )
+    )
+
+
+def _auth_fail_message(output: str, code: int) -> str:
+    """User-facing text when polkit/PackageKit could not show or complete a password dialog."""
+    base = (output or "").strip() or "Failed to obtain authorization"
+    return (
+        f"{base}. No password dialog appeared. On Kubuntu, confirm "
+        "polkit-kde-agent-1 is running, then try Install again."
+    )
+
+
 def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     code, output = run_streaming(argv, env=env)
     name = os.path.basename(argv[0]) if argv else ""
-    if name in {"pkcon", "pkgcli"}:
+    if name in {"pkcon", "pkgcli", "pkexec"}:
         if code == 0:
             return output
         if _looks_cancelled(output):
             raise CancelledError("Cancelled — administrator permission was not granted.")
+        if _looks_auth_failure(output):
+            raise RuntimeError(_auth_fail_message(output, code))
+        if name == "pkexec":
+            raise RuntimeError(_fail_message(output, code, "pkexec failed"))
         verb, packages = _pk_verb_and_packages(argv)
         mutating = verb in {"install", "remove", "update", "upgrade"}
         # pkcon: 5 = nothing useful / cancel on some versions. Never treat that as
@@ -73,6 +101,8 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     if code != 0:
         if _looks_cancelled(output):
             raise CancelledError("Cancelled — administrator permission was not granted.")
+        if _looks_auth_failure(output):
+            raise RuntimeError(_auth_fail_message(output, code))
         raise RuntimeError(_fail_message(output, code, f"command failed: {' '.join(argv)}"))
     return output
 
@@ -179,10 +209,23 @@ def _via_apt(args: list[str]) -> None:
 
 
 def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
-    """Use PackageKit or the helper, never both (avoids two password windows)."""
+    """Use PackageKit or the helper, never both on success (avoids two password windows).
+
+    If PackageKit fails specifically because polkit could not authorize (no dialog),
+    fall back once to pkexec + appgrid-apt-helper so the desktop agent can prompt.
+    """
     if _packagekit_cli():
-        _run_packagekit(pk_verb, packages)
-        return
+        try:
+            _run_packagekit(pk_verb, packages)
+            return
+        except CancelledError:
+            raise
+        except RuntimeError as exc:
+            if _helper() and _looks_auth_failure(str(exc)):
+                progress.report("Asking for administrator permission…")
+                _run_helper(helper_action, packages)
+                return
+            raise
     if _helper():
         _run_helper(helper_action, packages)
         return
