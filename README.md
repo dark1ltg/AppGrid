@@ -77,7 +77,9 @@ sudo apt install python3-pyqt6 python3-pyqt6.qtqml python3-pyqt6.qtquick \
   qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts \
   qml6-module-qtquick-window \
   python3-gi gir1.2-appstream-1.0 libqt6svg6 \
-  packagekit packagekit-tools pkexec
+  packagekit pkexec
+# Ubuntu 24.04 / Debian 12–13 also have packagekit-tools (pkcon). Debian Sid /
+# BlankOn dropped that package — PackageKit 1.4 ships pkgcli in packagekit instead.
 ```
 
 On 24.10+ / Debian 13+, the `.deb` prefers split `python3-pyside6.qt*` instead. AppGrid tries PySide6 first at runtime, then PyQt6.

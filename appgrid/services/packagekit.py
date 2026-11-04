@@ -26,11 +26,11 @@ def _looks_cancelled(output: str) -> bool:
 def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     code, output = run_streaming(argv, env=env)
     name = os.path.basename(argv[0]) if argv else ""
-    if name == "pkcon":
+    if name in {"pkcon", "pkgcli"}:
         if code == 0:
             return output
-        # 5 = nothing useful was done, or (on some versions) the user cancelled.
-        if code == 5:
+        # pkcon: 5 = nothing useful / cancel on some versions.
+        if name == "pkcon" and code == 5:
             if _looks_cancelled(output):
                 raise CancelledError("Cancelled.")
             lowered = output.lower()
@@ -57,12 +57,26 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     return output
 
 
+def _packagekit_cli() -> tuple[str, str] | None:
+    """Return (path, kind) for PackageKit CLI: pkcon (older) or pkgcli (1.4+/Sid)."""
+    for kind, candidates in (
+        ("pkcon", ("pkcon", "/usr/bin/pkcon")),
+        ("pkgcli", ("pkgcli", "/usr/bin/pkgcli")),
+    ):
+        for candidate in candidates:
+            if candidate.startswith("/"):
+                path = candidate if os.path.isfile(candidate) and os.access(candidate, os.X_OK) else None
+            else:
+                path = shutil.which(candidate)
+            if path:
+                return path, kind
+    return None
+
+
 def _pkcon() -> str | None:
-    path = shutil.which("pkcon")
-    if path:
-        return path
-    candidate = "/usr/bin/pkcon"
-    return candidate if os.path.isfile(candidate) and os.access(candidate, os.X_OK) else None
+    """Back-compat: path to any PackageKit CLI, or None."""
+    found = _packagekit_cli()
+    return found[0] if found else None
 
 
 def _helper() -> str | None:
@@ -89,11 +103,30 @@ def _apt_env() -> dict[str, str]:
     return env
 
 
-def _run_pkcon(args: list[str]) -> None:
-    pkcon = _pkcon()
-    if not pkcon:
-        raise RuntimeError("PackageKit (pkcon) is missing")
-    _run([pkcon, "--plain", "-y", *args])
+def _pk_argv(verb: str, packages: list[str] | None = None) -> list[str]:
+    """Build pkcon or pkgcli argv for a PackageKit action."""
+    found = _packagekit_cli()
+    if not found:
+        raise RuntimeError("PackageKit (pkcon/pkgcli) is missing")
+    path, kind = found
+    packages = packages or []
+    if kind == "pkgcli":
+        # PackageKit 1.4+ dropped pkcon; pkgcli uses --yes (not -y / --plain).
+        if verb == "refresh":
+            return [path, "refresh"]
+        if verb == "update-system":
+            return [path, "--yes", "update"]
+        return [path, "--yes", verb, *packages]
+    # Classic pkcon
+    if verb == "refresh":
+        return [path, "--plain", "-y", "refresh"]
+    if verb == "update-system":
+        return [path, "--plain", "-y", "--cache-age", "0", "update"]
+    return [path, "--plain", "-y", verb, *packages]
+
+
+def _run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+    _run(_pk_argv(verb, packages))
 
 
 def _run_helper(action: str, packages: list[str]) -> None:
@@ -114,21 +147,21 @@ def _via_apt(args: list[str]) -> None:
 
     binary = apt_bin()
     if not binary:
-        raise RuntimeError("AppGrid cannot install software: PackageKit (pkcon) or APT is missing")
+        raise RuntimeError("AppGrid cannot install software: PackageKit (pkcon/pkgcli) or APT is missing")
     if os.geteuid() == 0:
         _run([binary, *args], env=_apt_env())
         return
     raise RuntimeError(
         "AppGrid cannot ask for administrator permission. "
         "Install the AppGrid package so appgrid-apt-helper is in /usr/bin, "
-        "or install PackageKit (pkcon)."
+        "or install PackageKit (pkcon/pkgcli)."
     )
 
 
-def _one_auth_path(pkcon_args: list[str], helper_action: str, packages: list[str], apt_args: list[str]) -> None:
+def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
     """Use PackageKit or the helper, never both (avoids two password windows)."""
-    if _pkcon():
-        _run_pkcon(pkcon_args)
+    if _packagekit_cli():
+        _run_packagekit(pk_verb, packages)
         return
     if _helper():
         _run_helper(helper_action, packages)
@@ -139,22 +172,22 @@ def _one_auth_path(pkcon_args: list[str], helper_action: str, packages: list[str
 def install_packages(names: list[str]) -> None:
     packages = [_check_name(name) for name in names]
     progress.report(f"Installing {', '.join(packages)}…")
-    _one_auth_path(["install", *packages], "install", packages, ["install", "-y", *packages])
+    _one_auth_path("install", packages, "install", ["install", "-y", *packages])
 
 
 def remove_packages(names: list[str]) -> None:
     packages = [_check_name(name) for name in names]
     progress.report(f"Removing {', '.join(packages)}…")
-    _one_auth_path(["remove", *packages], "remove", packages, ["remove", "-y", *packages])
+    _one_auth_path("remove", packages, "remove", ["remove", "-y", *packages])
 
 
 def upgrade_packages(names: list[str]) -> None:
     packages = [_check_name(name) for name in names]
     progress.report(f"Updating {', '.join(packages)}…")
     _one_auth_path(
-        ["update", *packages],
-        "upgrade",
+        "update",
         packages,
+        "upgrade",
         ["install", "--only-upgrade", "-y", *packages],
     )
 
@@ -162,8 +195,8 @@ def upgrade_packages(names: list[str]) -> None:
 def refresh_package_indexes() -> None:
     """Download the latest package lists. May ask for the administrator password."""
     progress.report("Checking for updates…")
-    if _pkcon():
-        _run_pkcon(["refresh"])
+    if _packagekit_cli():
+        _run_packagekit("refresh")
         return
     if _helper():
         _run_helper("refresh", [])
@@ -182,9 +215,8 @@ def refresh_and_upgrade_system() -> None:
     Does not run do-release-upgrade or move 24.04 → 26.04.
     """
     progress.report("Updating installed packages and libraries…")
-    if _pkcon():
-        pkcon = _pkcon()
-        _run([pkcon, "--plain", "-y", "--cache-age", "0", "update"])
+    if _packagekit_cli():
+        _run_packagekit("update-system")
         return
     if _helper():
         _run_helper("refresh-upgrade", [])

@@ -26,7 +26,7 @@ Depends: ${python3:Depends}, ${misc:Depends},
  gir1.2-appstream-1.0,
  libqt6svg6,
  packagekit,
- packagekit-tools,
+ packagekit-tools | packagekit,
  pkexec,
  hicolor-icon-theme,
  fonts-ubuntu | fonts-liberation
