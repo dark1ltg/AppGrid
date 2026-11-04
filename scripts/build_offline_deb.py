@@ -42,8 +42,11 @@ SEEDS = [
     "qt6-wayland",
     "qt6-qpa-plugins",
     "qt6-svg-plugins",
+    # Qt6Core NEEDED libicui18n.so.74 / libicuuc.so.74 — not safe to assume
+    # the host soname matches Ubuntu 24.04 (BlankOn/Sid ships ICU 76).
+    "libicu74",
 ]
-# Only walk Depends that are Qt/PyQt/AppStream/PackageKit. Everything else
+# Only walk Depends that are Qt/PyQt/AppStream/PackageKit/ICU. Everything else
 # (libc, glib, Mesa, systemd, GTK) must already be on Ubuntu 24.04.
 BUNDLE_PREFIX = (
     "python3-pyqt6",
@@ -55,6 +58,7 @@ BUNDLE_PREFIX = (
     "packagekit",
     "libpackagekit",
     "fonts-ubuntu",
+    "libicu",
 )
 SKIP = {
     "adduser",
