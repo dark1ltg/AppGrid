@@ -140,14 +140,42 @@ def _debian_weight(char: str) -> tuple[int, int]:
     return (3, ord(char))
 
 
+def _looks_runtime_train(version: str) -> bool:
+    """Flatpak runtime-style trains (e.g. 24.08.1) mis-rank as Debian vs 1.2.0 (#8)."""
+    text = (version or "").strip()
+    if not text:
+        return False
+    return bool(re.match(r"^\d{2}\.\d{2}(\.|$)", text))
+
+
+def _cross_backend_by_version(left: AppEntry, right: AppEntry) -> AppEntry | None:
+    """Compare versions across backends without Debian-ranking runtime trains (#8)."""
+    if not left.version and not right.version:
+        return None
+    if not left.version:
+        return right
+    if not right.version:
+        return left
+    left_rt = _looks_runtime_train(left.version)
+    right_rt = _looks_runtime_train(right.version)
+    # Don't Debian-compare a runtime train against a normal app version.
+    if left_rt != right_rt:
+        return None
+    by_version = _cmp_versions(left.version, right.version)
+    if by_version > 0:
+        return left
+    if by_version < 0:
+        return right
+    return None
+
+
 def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
     """Pick the newest build.
 
-    Same-backend APT: Debian version compare.
-    Cross-backend: prefer release_ts (Flatpak runtime-style versions mis-rank as Debian) (#8).
-    A present release_ts beats 0; if still tied, fall back to version compare (#2).
-    A side with a version beats an empty version (#4).
-    On a remaining tie, prefer native APT.
+    Same-backend: Debian version compare, then release_ts.
+    Cross-backend: both release_ts → newer ts; one-sided ts yields to a clearly
+    newer version string on the other side (#4); never Debian-compare a runtime
+    train against a normal version (#8). Empty version loses. Remaining tie → APT.
     """
     same_backend = left.backend == right.backend
     if same_backend:
@@ -163,23 +191,24 @@ def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
             if right.release_ts > left.release_ts:
                 return right
     else:
-        # Prefer a present timestamp over missing/0 (#2).
-        if left.release_ts or right.release_ts:
-            if left.release_ts and right.release_ts:
-                if left.release_ts > right.release_ts:
-                    return left
-                if right.release_ts > left.release_ts:
-                    return right
-            elif left.release_ts:
+        if left.release_ts and right.release_ts:
+            if left.release_ts > right.release_ts:
                 return left
-            else:
+            if right.release_ts > left.release_ts:
                 return right
-        if left.version or right.version:
-            by_version = _cmp_versions(left.version, right.version)
-            if by_version > 0:
-                return left
-            if by_version < 0:
-                return right
+        elif left.release_ts or right.release_ts:
+            # One-sided ts: a clearly newer version on the other side wins (#4).
+            ts_side = left if left.release_ts else right
+            other = right if ts_side is left else left
+            if other.version and ts_side.version:
+                if _cmp_versions(other.version, ts_side.version) > 0:
+                    return other
+            elif other.version and not ts_side.version:
+                return other
+            return ts_side
+        by_version = _cross_backend_by_version(left, right)
+        if by_version is not None:
+            return by_version
     if left.backend == "apt":
         return left
     if right.backend == "apt":

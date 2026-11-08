@@ -67,11 +67,21 @@ class FlatpakBackend(PackageBackend):
                 entry.scopes = list(record["scopes"])
                 if record["version"] and not entry.version:
                     entry.version = record["version"]
-            entry.has_update = entry.app_id in updates
+            entry.has_update = (
+                entry.app_id in updates
+                or f"{entry.app_id}.desktop" in updates
+                or entry.app_id.removesuffix(".desktop") in updates
+            )
             entry.origin = display_origin(entry.origin)
         for app_id, record in installed.items():
             if app_id in seen or app_id.removesuffix(".desktop") in seen:
                 continue
+            # Match update ids with or without a .desktop suffix (#6).
+            has_update = (
+                app_id in updates
+                or app_id.removesuffix(".desktop") in updates
+                or f"{app_id}.desktop" in updates
+            )
             entries.append(
                 AppEntry(
                     uid=f"flatpak:{app_id}",
@@ -82,6 +92,7 @@ class FlatpakBackend(PackageBackend):
                     package=app_id,
                     version=record["version"],
                     installed=True,
+                    has_update=has_update,
                     origin="Flathub",
                     accent="#4A90D9",
                     scopes=list(record["scopes"]),

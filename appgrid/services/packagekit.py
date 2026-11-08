@@ -9,6 +9,20 @@ from appgrid.services.jobs import CancelledError, run_streaming
 
 _CANCEL_TEXT = ("dismissed", "not authorized", "cancelled", "canceled")
 _NOOP_TEXT = ("nothing useful", "no updates", "already", "no packages")
+# Only “no dialog / no session” — not wrong-password after a dialog (#2).
+_HELPER_FALLBACK_TEXT = (
+    "failed to obtain authorization",
+    "no session for cookie",
+    "no agent is available",
+    "authorization requires authentication but no agent",
+)
+_WRONG_PASSWORD_TEXT = (
+    "authentication failed",
+    "authentication failure",
+    "pam_authenticate",
+    "incorrect password",
+    "not authenticated",
+)
 
 
 def _check_name(name: str) -> str:
@@ -38,23 +52,31 @@ def _fail_message(output: str, code: int, fallback: str) -> str:
     return f"{fallback} (exit {code})"
 
 
-def _looks_auth_failure(output: str) -> bool:
+def _looks_wrong_password(output: str) -> bool:
     text = (output or "").lower()
-    return any(
-        token in text
-        for token in (
-            "failed to obtain authorization",
-            "failed to obtain authentication",
-            "not authorized",
-            "authorization failed",
-            "authentication failed",
-            "no session for cookie",
-        )
-    )
+    return any(token in text for token in _WRONG_PASSWORD_TEXT)
+
+
+def _looks_helper_fallback(output: str) -> bool:
+    """True when PackageKit failed without a usable password dialog (#2, #7)."""
+    text = (output or "").lower()
+    if _looks_wrong_password(text):
+        return False
+    if any(token in text for token in _HELPER_FALLBACK_TEXT):
+        return True
+    # Blank PK/pkexec failure is usually session/auth with no agent text (#7).
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if stripped.startswith("packagekit failed (exit") or stripped.startswith("pkexec failed (exit"):
+        return True
+    if "no password dialog" in stripped:
+        return True
+    return False
 
 
 def _auth_fail_message(output: str, code: int) -> str:
-    """User-facing text when polkit/PackageKit could not show or complete a password dialog."""
+    """User-facing text when polkit/PackageKit could not show a password dialog."""
     base = (output or "").strip() or "Failed to obtain authorization"
     return (
         f"{base}. No password dialog appeared. On Kubuntu, confirm "
@@ -70,7 +92,14 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
             return output
         if _looks_cancelled(output):
             raise CancelledError("Cancelled — administrator permission was not granted.")
-        if _looks_auth_failure(output):
+        if _looks_wrong_password(output):
+            raise RuntimeError(
+                _fail_message(output, code, "Administrator password was not accepted")
+            )
+        # Empty or no-agent auth failures — mark clearly so helper fallback can match (#7).
+        if not (output or "").strip() or any(
+            token in (output or "").lower() for token in _HELPER_FALLBACK_TEXT
+        ):
             raise RuntimeError(_auth_fail_message(output, code))
         if name == "pkexec":
             raise RuntimeError(_fail_message(output, code, "pkexec failed"))
@@ -93,7 +122,6 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
                 return output
             if verb in {"refresh", "update", "upgrade"} and not packages:
                 return output
-            # pkcon --plain -y <verb>  (no extra packages)
             if not packages:
                 return output
             raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
@@ -101,7 +129,11 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
     if code != 0:
         if _looks_cancelled(output):
             raise CancelledError("Cancelled — administrator permission was not granted.")
-        if _looks_auth_failure(output):
+        if _looks_wrong_password(output):
+            raise RuntimeError(
+                _fail_message(output, code, "Administrator password was not accepted")
+            )
+        if _looks_helper_fallback(output):
             raise RuntimeError(_auth_fail_message(output, code))
         raise RuntimeError(_fail_message(output, code, f"command failed: {' '.join(argv)}"))
     return output
@@ -208,26 +240,39 @@ def _via_apt(args: list[str]) -> None:
     )
 
 
-def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
-    """Use PackageKit or the helper, never both on success (avoids two password windows).
+def _packagekit_then_helper(
+    pk_verb: str, helper_action: str, packages: list[str] | None = None
+) -> bool:
+    """Run PackageKit; on no-dialog auth failure, fall back to helper once.
 
-    If PackageKit fails specifically because polkit could not authorize (no dialog),
-    fall back once to pkexec + appgrid-apt-helper so the desktop agent can prompt.
+    Returns True if PackageKit or helper handled the call. False if neither is available.
     """
+    packages = packages or []
     if _packagekit_cli():
         try:
             _run_packagekit(pk_verb, packages)
-            return
+            return True
         except CancelledError:
             raise
         except RuntimeError as exc:
-            if _helper() and _looks_auth_failure(str(exc)):
+            if _helper() and _looks_helper_fallback(str(exc)):
                 progress.report("Asking for administrator permission…")
                 _run_helper(helper_action, packages)
-                return
+                return True
             raise
     if _helper():
         _run_helper(helper_action, packages)
+        return True
+    return False
+
+
+def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
+    """Use PackageKit or the helper, never both on success (avoids two password windows).
+
+    Helper fallback only when PackageKit could not show a dialog (#2), not after a
+    wrong password. Blank PK failures also fall back (#7).
+    """
+    if _packagekit_then_helper(pk_verb, helper_action, packages):
         return
     _via_apt(apt_args)
 
@@ -258,11 +303,7 @@ def upgrade_packages(names: list[str]) -> None:
 def refresh_package_indexes() -> None:
     """Download the latest package lists. May ask for the administrator password."""
     progress.report("Checking for updates…")
-    if _packagekit_cli():
-        _run_packagekit("refresh")
-        return
-    if _helper():
-        _run_helper("refresh", [])
+    if _packagekit_then_helper("refresh", "refresh", []):
         return
     from appgrid.helpers.apt_helper import apt_bin
 
@@ -274,15 +315,12 @@ def refresh_package_indexes() -> None:
 def refresh_and_upgrade_system() -> None:
     """Refresh indexes, then upgrade packages on this Ubuntu/Debian release only.
 
-    PackageKit first; privileged helper is fallback only (#6).
+    PackageKit first; privileged helper is fallback only (#6), including auth
+    no-dialog recovery like per-app install (#3).
     Does not run do-release-upgrade or move 24.04 → 26.04.
     """
     progress.report("Updating installed packages and libraries…")
-    if _packagekit_cli():
-        _run_packagekit("update-system")
-        return
-    if _helper():
-        _run_helper("refresh-upgrade", [])
+    if _packagekit_then_helper("update-system", "refresh-upgrade", []):
         return
     from appgrid.helpers.apt_helper import apt_bin, same_release_upgrade_args
 

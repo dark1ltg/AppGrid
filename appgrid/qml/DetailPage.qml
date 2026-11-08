@@ -20,7 +20,8 @@ Page {
         font.weight: Fonts.medium
         Label {
             text: controller.selectedCopyCount > 1
-                  ? "Remove " + controller.selectedName + "? Every installed copy will be removed."
+                  ? "Remove " + controller.selectedName
+                    + "? All installed copies on this computer will be removed."
                   : "Remove " + controller.selectedName + "?"
             wrapMode: Text.WordWrap
             width: 420

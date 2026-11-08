@@ -142,13 +142,14 @@ class PackageKitFirstTests(unittest.TestCase):
                 packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
         self.assertIn("nothing useful", str(ctx.exception))
 
-    def test_pkcon_exit_5_empty_install_surfaces_exit_code(self) -> None:
+    def test_pkcon_exit_5_empty_install_surfaces_auth_message(self) -> None:
         from appgrid.services import packagekit
 
         with mock.patch.object(packagekit, "run_streaming", return_value=(5, "")):
             with self.assertRaises(RuntimeError) as ctx:
                 packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
-        self.assertIn("exit 5", str(ctx.exception))
+        # Blank PK failure is treated as no-dialog auth so helper fallback can match (#7).
+        self.assertIn("authorization", str(ctx.exception).lower())
 
     def test_pkcon_exit_5_refresh_noop_ok(self) -> None:
         from appgrid.services import packagekit
@@ -174,22 +175,26 @@ class PackageKitFirstTests(unittest.TestCase):
 class StickyStatusTests(unittest.TestCase):
     def test_post_action_reload_does_not_clear_via_reload(self) -> None:
         """Post-action refresh must call _reload(False), not reload() (clears sticky)."""
-        import inspect
+        from pathlib import Path
 
-        from appgrid.controller import AppController
-
-        src = inspect.getsource(AppController._reload_after_action)
-        self.assertIn("self._reload(False)", src)
-        self.assertNotIn("self.reload()", src)
+        src = Path("appgrid/controller.py").read_text(encoding="utf-8")
+        # Isolate _reload_after_action body.
+        start = src.index("def _reload_after_action")
+        end = src.index("\n    @Slot()", start)
+        body = src[start:end]
+        self.assertIn("self._reload(False)", body)
+        self.assertNotIn("self.reload()", body)
 
     def test_apply_catalog_keeps_pending_status(self) -> None:
-        import inspect
+        from pathlib import Path
 
-        from appgrid.controller import AppController
-
-        src = inspect.getsource(AppController._apply_catalog)
-        self.assertIn("self._pending_status", src)
-        self.assertNotIn("self._pending_status = None", src)
+        src = Path("appgrid/controller.py").read_text(encoding="utf-8")
+        start = src.index("def _apply_catalog")
+        end = src.index("\n    def _clear_pending_status", start)
+        body = src[start:end]
+        self.assertIn("self._pending_status", body)
+        self.assertNotIn("self._pending_status = None", body)
+        self.assertIn("_clear_pending_status", body)
 
 
 class PolkitSessionTests(unittest.TestCase):
@@ -226,6 +231,72 @@ class PolkitSessionTests(unittest.TestCase):
                                 "install", ["hello"], "install", ["install", "-y", "hello"]
                             )
         self.assertEqual(helper_calls, [("install", ["hello"])])
+
+    def test_wrong_password_does_not_fall_back_to_helper(self) -> None:
+        from appgrid.services import packagekit
+
+        helper_calls: list[tuple] = []
+
+        def fake_run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+            raise RuntimeError("Authentication failed: incorrect password")
+
+        def fake_run_helper(action: str, packages: list[str]) -> None:
+            helper_calls.append((action, list(packages)))
+
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkgcli", "pkgcli")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
+                with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
+                    with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
+                        with mock.patch.object(packagekit.progress, "report"):
+                            with self.assertRaises(RuntimeError):
+                                packagekit._one_auth_path(
+                                    "install", ["hello"], "install", ["install", "-y", "hello"]
+                                )
+        self.assertEqual(helper_calls, [])
+
+    def test_empty_pk_failure_falls_back_to_helper(self) -> None:
+        from appgrid.services import packagekit
+
+        helper_calls: list[tuple] = []
+
+        def fake_run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+            raise RuntimeError("PackageKit failed (exit 1)")
+
+        def fake_run_helper(action: str, packages: list[str]) -> None:
+            helper_calls.append((action, list(packages)))
+
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkgcli", "pkgcli")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
+                with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
+                    with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
+                        with mock.patch.object(packagekit.progress, "report"):
+                            packagekit.refresh_and_upgrade_system()
+        self.assertEqual(helper_calls, [("refresh-upgrade", [])])
+
+    def test_refresh_indexes_falls_back_to_helper(self) -> None:
+        from appgrid.services import packagekit
+
+        helper_calls: list[tuple] = []
+
+        def fake_run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+            raise RuntimeError("Failed to obtain authorization. No password dialog appeared.")
+
+        def fake_run_helper(action: str, packages: list[str]) -> None:
+            helper_calls.append((action, list(packages)))
+
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkcon", "pkcon")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
+                with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
+                    with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
+                        with mock.patch.object(packagekit.progress, "report"):
+                            packagekit.refresh_package_indexes()
+        self.assertEqual(helper_calls, [("refresh", [])])
 
 
 if __name__ == "__main__":

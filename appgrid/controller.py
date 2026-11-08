@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from appgrid.qt import Property, QObject, QTimer, Signal, Slot
 
 from appgrid.backends.base import AppEntry
@@ -11,6 +13,11 @@ from appgrid.services import jobs
 from appgrid.services.distro import UNSUPPORTED_MESSAGE, is_debian_family, native_store_label
 from appgrid.services.settings import AppSettings
 from appgrid.services.worker import ActionWorker, CatalogWorker
+
+# Re-check package indexes when opening Updates after this many seconds (#9).
+_INDEX_REFRESH_COOLDOWN_S = 60.0
+# How long Install/fail footer stays before returning to catalog counts (#10).
+_PENDING_STATUS_HOLD_MS = 5000
 
 
 class AppController(QObject):
@@ -54,7 +61,7 @@ class AppController(QObject):
         self._reload_again = False
         self._reload_refresh = False
         self._post_action_reload = False
-        self._index_refresh_done = False
+        self._index_refresh_at = 0.0
         self._index_refresh_pending = False
         if not self._supported:
             self._busy = False
@@ -278,12 +285,16 @@ class AppController(QObject):
         if not self._selected:
             return ""
         installed = self._installed_native_copies()
+        # Newer uninstalled winner → Install even if an older copy has an update (#5).
+        if (
+            installed
+            and not self._selected.self_installed
+            and self._selected.backend in {"apt", "flatpak"}
+        ):
+            return "install"
         if installed and self._selected.has_update:
             return "update"
         if not installed:
-            return "install"
-        # Older copy installed, but the card face is a newer uninstalled source (#3).
-        if not self._selected.self_installed and self._selected.backend in {"apt", "flatpak"}:
             return "install"
         return ""
 
@@ -499,15 +510,29 @@ class AppController(QObject):
             f"{counts['all']} apps · {counts['installed']} installed · {counts['updates']} updates"
         )
         self._set_status(status)
+        if self._pending_status and not self._action_running() and not self._catalog_running():
+            # After the user has had time to read it, return to catalog counts (#10).
+            QTimer.singleShot(_PENDING_STATUS_HOLD_MS, self._clear_pending_status)
         if not self._action_running():
             self._set_busy(False)
         self.catalogChanged.emit()
         self.selectionChanged.emit()
 
+    def _clear_pending_status(self) -> None:
+        if not self._pending_status:
+            return
+        if self._action_running() or self._catalog_running():
+            return
+        self._pending_status = None
+        counts = self._model.counts()
+        self._set_status(
+            f"{counts['all']} apps · {counts['installed']} installed · {counts['updates']} updates"
+        )
+
     def _on_indexes_refreshed(self, ok: bool) -> None:
         self._index_refresh_pending = False
         if ok:
-            self._index_refresh_done = True
+            self._index_refresh_at = time.monotonic()
 
     def _on_catalog_fail(self, message: str) -> None:
         self._index_refresh_pending = False
@@ -516,6 +541,8 @@ class AppController(QObject):
         # Prefer a pending action error over a generic catalog-cancel wipe.
         text = self._pending_status or message or "Could not load the app list"
         self._set_status(text)
+        if self._pending_status and not self._action_running():
+            QTimer.singleShot(_PENDING_STATUS_HOLD_MS, self._clear_pending_status)
         if not self._action_running():
             self._set_busy(False)
         self.catalogChanged.emit()
@@ -536,15 +563,17 @@ class AppController(QObject):
         self._model.apply_filters(self._query, self._filter, self._category)
         self.filterChanged.emit()
         self.catalogChanged.emit()
+        # Refresh indexes when opening Updates, with a short cooldown (#9).
+        stale = (time.monotonic() - self._index_refresh_at) >= _INDEX_REFRESH_COOLDOWN_S
         if (
             mode == "updates"
             and self._supported
             and not self._demo
-            and not self._index_refresh_done
+            and stale
             and not self._index_refresh_pending
         ):
             self._index_refresh_pending = True
-            if self._action_running():
+            if self._action_running() or self._catalog_running():
                 self._reload_refresh = True
                 self._reload_again = True
                 self._index_refresh_pending = False

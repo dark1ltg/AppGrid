@@ -76,21 +76,33 @@ class AptBackend(PackageBackend):
 
     def _apt_state(self) -> tuple[dict[str, str], dict[str, str], set[str]]:
         # CLI only: python-apt is not safe on a background thread.
-        return self._installed_packages(), {}, self._simulated_upgrades() | self._listed_upgrades()
+        candidates, upgradable = self._listed_upgrades()
+        return self._installed_packages(), candidates, self._simulated_upgrades() | upgradable
 
-    def _listed_upgrades(self) -> set[str]:
+    def _listed_upgrades(self) -> tuple[dict[str, str], set[str]]:
+        """Return (candidate_versions, upgradable_names) from apt list --upgradable."""
         binary = "/usr/bin/apt"
         if not os.path.isfile(binary) or not os.access(binary, os.X_OK):
-            return set()
+            return {}, set()
         result = run_capture([binary, "list", "--upgradable", "-qq"])
         names: set[str] = set()
+        candidates: dict[str, str] = {}
         for line in result.stdout.splitlines():
             if "/" not in line:
                 continue
-            name = line.split("/", 1)[0].split(":", 1)[0].strip()
-            if name:
-                names.add(name)
-        return names
+            # pkg/suite version arch [upgradable from: old]
+            head, _, rest = line.partition("/")
+            name = head.split(":", 1)[0].strip()
+            if not name:
+                continue
+            names.add(name)
+            parts = rest.split()
+            # parts[0] is suite; parts[1] is candidate version when present.
+            if len(parts) >= 2 and parts[1] not in {"amd64", "i386", "arm64", "all", "armhf"}:
+                candidates[name] = parts[1]
+            elif len(parts) >= 3:
+                candidates[name] = parts[1]
+        return candidates, names
 
     def refresh(self) -> list[AppEntry]:
         if not self.available():

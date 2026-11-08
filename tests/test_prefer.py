@@ -215,6 +215,50 @@ class PreferMergeTests(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0].backend, "flatpak")
 
+    def test_one_sided_ts_yields_to_newer_version(self) -> None:
+        """Lone release_ts must not beat a clearly newer version on the other side (#4)."""
+        apt = _entry(
+            uid="apt:app",
+            backend="apt",
+            name="App",
+            app_id="org.example.app",
+            package="app",
+            version="2.0",
+            release_ts=0,
+        )
+        flatpak = _entry(
+            uid="flatpak:org.example.app",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="1.0",
+            release_ts=1000,
+        )
+        self.assertIs(newer_source(apt, flatpak), apt)
+        self.assertIs(newer_source(flatpak, apt), apt)
+
+    def test_runtime_train_does_not_debian_beat_app_version(self) -> None:
+        """Cross-backend: runtime-style 24.08.x must not Debian-rank over 1.2.0 (#8)."""
+        apt = _entry(
+            uid="apt:app",
+            backend="apt",
+            name="App",
+            app_id="org.example.app",
+            package="app",
+            version="1.2.0-1",
+        )
+        flatpak = _entry(
+            uid="flatpak:org.example.app",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="24.08.1",
+        )
+        # No comparable scheme → APT tie-break.
+        self.assertIs(newer_source(apt, flatpak), apt)
+
 
 if __name__ == "__main__":
     unittest.main()

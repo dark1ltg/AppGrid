@@ -138,7 +138,11 @@ class BackendRegistry:
                 entry.scopes = list(record.get("scopes") or [])
                 if record.get("version") and not entry.version:
                     entry.version = record["version"]
-            entry.has_update = entry.app_id in fp_updates
+            entry.has_update = (
+                entry.app_id in fp_updates
+                or f"{entry.app_id}.desktop" in fp_updates
+                or entry.app_id.removesuffix(".desktop") in fp_updates
+            )
             entry.origin = display_origin(entry.origin)
         entry.self_installed = bool(entry.installed)
         entry.self_has_update = bool(entry.has_update)
