@@ -129,7 +129,12 @@ class BackendRegistry:
         if entry.backend == "apt":
             pkg = entry.package
             entry.installed = pkg in apt_installed
-            entry.version = candidates.get(pkg) or apt_installed.get(pkg, entry.version)
+            # Keep installed version on the card for prefer/merge (#3); candidates
+            # only drive has_update via the upgradable set.
+            if pkg in apt_installed:
+                entry.version = apt_installed[pkg]
+            elif pkg in candidates:
+                entry.version = candidates[pkg]
             entry.has_update = pkg in upgradable
         elif entry.backend == "flatpak":
             record = fp_installed.get(entry.app_id) or fp_installed.get(f"{entry.app_id}.desktop")

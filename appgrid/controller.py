@@ -55,6 +55,8 @@ class AppController(QObject):
         self._query = ""
         self._selected: AppEntry | None = None
         self._pending_status: str | None = None
+        # Generation so a stale clear timer cannot wipe a newer sticky (#4).
+        self._pending_status_gen: int = 0
         self._active_action: str = ""
         self._worker: ActionWorker | None = None
         self._catalog_worker: CatalogWorker | None = None
@@ -360,6 +362,13 @@ class AppController(QObject):
         )
 
     @Property(bool, notify=selectionChanged)
+    def selectedCanUpdateInstalled(self) -> bool:
+        """Update for older installed copy while Install-newer is primary (hunt-4 sev 3)."""
+        if not self.selectedInstallOverCopy:
+            return False
+        return any(copy.self_has_update for copy in self._installed_native_copies())
+
+    @Property(bool, notify=selectionChanged)
     def selectedCanRemove(self) -> bool:
         return bool(self._installed_native_copies())
 
@@ -430,6 +439,7 @@ class AppController(QObject):
     @Slot()
     def reload(self) -> None:
         self._pending_status = None
+        self._pending_status_gen += 1
         self._reload(False)
 
     def _reload(self, refresh_indexes: bool) -> None:
@@ -512,13 +522,22 @@ class AppController(QObject):
         self._set_status(status)
         if self._pending_status and not self._action_running() and not self._catalog_running():
             # After the user has had time to read it, return to catalog counts (#10).
-            QTimer.singleShot(_PENDING_STATUS_HOLD_MS, self._clear_pending_status)
+            self._schedule_pending_clear()
         if not self._action_running():
             self._set_busy(False)
         self.catalogChanged.emit()
         self.selectionChanged.emit()
 
-    def _clear_pending_status(self) -> None:
+    def _schedule_pending_clear(self) -> None:
+        token = self._pending_status_gen
+        QTimer.singleShot(
+            _PENDING_STATUS_HOLD_MS, lambda: self._clear_pending_status(token)
+        )
+
+    def _clear_pending_status(self, token: int | None = None) -> None:
+        # Ignore stale timers from an earlier sticky message (#4).
+        if token is not None and token != self._pending_status_gen:
+            return
         if not self._pending_status:
             return
         if self._action_running() or self._catalog_running():
@@ -542,7 +561,7 @@ class AppController(QObject):
         text = self._pending_status or message or "Could not load the app list"
         self._set_status(text)
         if self._pending_status and not self._action_running():
-            QTimer.singleShot(_PENDING_STATUS_HOLD_MS, self._clear_pending_status)
+            self._schedule_pending_clear()
         if not self._action_running():
             self._set_busy(False)
         self.catalogChanged.emit()
@@ -635,6 +654,7 @@ class AppController(QObject):
                 "update": f"Updating {entry.name}…",
             }[action]
         self._pending_status = None
+        self._pending_status_gen += 1
         self._set_active_action(action)
         self._set_busy(True)
         self._set_progress_percent(-1)
@@ -659,6 +679,7 @@ class AppController(QObject):
         # Mirror fail-path: deferred reload until the action thread has stopped (#1).
         self._set_active_action("")
         self._pending_status = message
+        self._pending_status_gen += 1
         self._set_status(message or "Done")
         self._reload_again = True
         worker = self._worker
@@ -673,9 +694,11 @@ class AppController(QObject):
         self._set_active_action("")
         text = message or "Action failed"
         self._pending_status = text
+        self._pending_status_gen += 1
         self._set_status(text)
         self._index_refresh_pending = False
-        self._reload_refresh = False
+        # Keep a queued Updates index refresh across fail (#8); do not clear
+        # _reload_refresh here — success path already preserves it.
         # Keep busy until reload starts so a new action cannot interleave (#6).
         self._reload_again = True
         worker = self._worker

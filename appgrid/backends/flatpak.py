@@ -190,3 +190,9 @@ class FlatpakBackend(PackageBackend):
                 errors.append(str(exc))
         if done == 0:
             raise RuntimeError(errors[-1] if errors else "flatpak update failed")
+        # Non-cancel partial failure is not full success (#7).
+        if errors:
+            raise RuntimeError(
+                f"Could not fully update Flatpaks "
+                f"({done}/2 scopes ok). {errors[-1]}"
+            )

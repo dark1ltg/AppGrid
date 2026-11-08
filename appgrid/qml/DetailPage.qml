@@ -282,6 +282,32 @@ Page {
                             controller.installSelected()
                     }
                 }
+                Button {
+                    // Older installed copy still has an update while Install-newer is primary.
+                    visible: controller.selectedCanUpdateInstalled
+                    text: "Update installed"
+                    font.family: Fonts.sans
+                    font.pixelSize: Fonts.button
+                    font.weight: Fonts.medium
+                    enabled: !controller.busy && controller.selectedUid !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    onClicked: controller.updateSelected()
+                    background: Rectangle {
+                        radius: 8
+                        color: parent.down ? "#243044" : (parent.hovered ? "#1C2433" : "transparent")
+                        border.width: 1
+                        border.color: "#4A5564"
+                        opacity: parent.enabled ? 1 : 0.45
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        font: parent.font
+                        color: "#C5D0DE"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
                 Item {
                     visible: controller.selectedCanRemove
                     Layout.fillWidth: true

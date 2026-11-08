@@ -8,8 +8,16 @@ from appgrid.services import progress
 from appgrid.services.jobs import CancelledError, run_streaming
 
 _CANCEL_TEXT = ("dismissed", "not authorized", "cancelled", "canceled")
-_NOOP_TEXT = ("nothing useful", "no updates", "already", "no packages")
-# Only “no dialog / no session” — not wrong-password after a dialog (#2).
+# Do not include bare "already" — matches "already locked" / "already running" (#1).
+_NOOP_TEXT = (
+    "nothing useful",
+    "no updates",
+    "no packages",
+    "already up-to-date",
+    "already up to date",
+    "already the newest",
+)
+# Only explicit “no dialog / no session” — not blank output, not wrong password (#2).
 _HELPER_FALLBACK_TEXT = (
     "failed to obtain authorization",
     "no session for cookie",
@@ -22,6 +30,19 @@ _WRONG_PASSWORD_TEXT = (
     "pam_authenticate",
     "incorrect password",
     "not authenticated",
+)
+_PK_VERBS = frozenset(
+    {
+        "install",
+        "remove",
+        "update",
+        "upgrade",
+        "refresh",
+        "get-details",
+        "resolve",
+        "search",
+        "get-updates",
+    }
 )
 
 
@@ -38,10 +59,18 @@ def _looks_cancelled(output: str) -> bool:
 
 
 def _pk_verb_and_packages(argv: list[str]) -> tuple[str, list[str]]:
-    """Strip flags from pkcon/pkgcli argv → (verb, packages)."""
+    """Strip flags from pkcon/pkgcli argv → (verb, packages).
+
+    Skips bare numeric tokens (e.g. --cache-age 0) so they are not mistaken for
+    the verb (#5).
+    """
     positional = [a for a in argv[1:] if a and not a.startswith("-")]
     if not positional:
         return "", []
+    # Prefer a known PackageKit verb if a numeric cache-age slipped through.
+    for index, token in enumerate(positional):
+        if token in _PK_VERBS or not token.isdigit():
+            return token, positional[index + 1 :]
     return positional[0], positional[1:]
 
 
@@ -58,19 +87,19 @@ def _looks_wrong_password(output: str) -> bool:
 
 
 def _looks_helper_fallback(output: str) -> bool:
-    """True when PackageKit failed without a usable password dialog (#2, #7)."""
+    """True only for explicit no-dialog/session auth failures (#2).
+
+    Blank PackageKit output does **not** open pkexec — that caused a second
+    password dialog after odd empty failures.
+    """
     text = (output or "").lower()
     if _looks_wrong_password(text):
         return False
     if any(token in text for token in _HELPER_FALLBACK_TEXT):
         return True
-    # Blank PK/pkexec failure is usually session/auth with no agent text (#7).
-    stripped = text.strip()
-    if not stripped:
-        return True
-    if stripped.startswith("packagekit failed (exit") or stripped.startswith("pkexec failed (exit"):
-        return True
-    if "no password dialog" in stripped:
+    if "no password dialog" in text and any(
+        token in text for token in _HELPER_FALLBACK_TEXT
+    ):
         return True
     return False
 
@@ -96,11 +125,12 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
             raise RuntimeError(
                 _fail_message(output, code, "Administrator password was not accepted")
             )
-        # Empty or no-agent auth failures — mark clearly so helper fallback can match (#7).
-        if not (output or "").strip() or any(
-            token in (output or "").lower() for token in _HELPER_FALLBACK_TEXT
-        ):
+        lowered = (output or "").lower()
+        # Explicit no-agent text → auth message (helper may recover). Blank → plain fail (#2).
+        if any(token in lowered for token in _HELPER_FALLBACK_TEXT):
             raise RuntimeError(_auth_fail_message(output, code))
+        if not (output or "").strip():
+            raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
         if name == "pkexec":
             raise RuntimeError(_fail_message(output, code, "pkexec failed"))
         verb, packages = _pk_verb_and_packages(argv)
@@ -108,12 +138,17 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
         # pkcon: 5 = nothing useful / cancel on some versions. Never treat that as
         # success for install/remove/update when packages were named (Kubuntu silent fail).
         if name == "pkcon" and code == 5:
-            lowered = output.lower()
             if any(
                 token in lowered
                 for token in ("not found", "couldn't find", "could not find", "no such package")
             ):
                 raise RuntimeError(_fail_message(output, code, "Package not found"))
+            # Busy/locked must not look like success (#1).
+            if any(
+                token in lowered
+                for token in ("locked", "already running", "cannot obtain lock", "unable to acquire")
+            ):
+                raise RuntimeError(_fail_message(output, code, "PackageKit is busy"))
             if mutating and packages:
                 raise RuntimeError(
                     _fail_message(output, code, f"PackageKit could not {verb} the package")
@@ -121,6 +156,11 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
             if output and any(token in lowered for token in _NOOP_TEXT):
                 return output
             if verb in {"refresh", "update", "upgrade"} and not packages:
+                # Exit 5 with no clear noop text on system update/refresh → fail closed (#1).
+                if verb in {"update", "upgrade"} and not any(
+                    token in lowered for token in _NOOP_TEXT
+                ):
+                    raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
                 return output
             if not packages:
                 return output
@@ -199,11 +239,11 @@ def _pk_argv(verb: str, packages: list[str] | None = None) -> list[str]:
         if verb == "update-system":
             return [path, "--yes", "update"]
         return [path, "--yes", verb, *packages]
-    # Classic pkcon
+    # Classic pkcon — use --cache-age=0 so "0" is not a positional verb (#5).
     if verb == "refresh":
         return [path, "--plain", "-y", "refresh"]
     if verb == "update-system":
-        return [path, "--plain", "-y", "--cache-age", "0", "update"]
+        return [path, "--plain", "-y", "--cache-age=0", "update"]
     return [path, "--plain", "-y", verb, *packages]
 
 
@@ -269,8 +309,8 @@ def _packagekit_then_helper(
 def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
     """Use PackageKit or the helper, never both on success (avoids two password windows).
 
-    Helper fallback only when PackageKit could not show a dialog (#2), not after a
-    wrong password. Blank PK failures also fall back (#7).
+    Helper fallback only when PackageKit could not show a dialog — not after a
+    wrong password, and not on blank/empty PK output (#2).
     """
     if _packagekit_then_helper(pk_verb, helper_action, packages):
         return

@@ -142,14 +142,16 @@ class PackageKitFirstTests(unittest.TestCase):
                 packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
         self.assertIn("nothing useful", str(ctx.exception))
 
-    def test_pkcon_exit_5_empty_install_surfaces_auth_message(self) -> None:
+    def test_pkcon_exit_5_empty_install_is_plain_failure(self) -> None:
         from appgrid.services import packagekit
 
         with mock.patch.object(packagekit, "run_streaming", return_value=(5, "")):
             with self.assertRaises(RuntimeError) as ctx:
                 packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
-        # Blank PK failure is treated as no-dialog auth so helper fallback can match (#7).
-        self.assertIn("authorization", str(ctx.exception).lower())
+        # Blank output is a plain PackageKit fail — not auth / helper bait (hunt-4 #2).
+        text = str(ctx.exception).lower()
+        self.assertIn("packagekit", text)
+        self.assertNotIn("authorization", text)
 
     def test_pkcon_exit_5_refresh_noop_ok(self) -> None:
         from appgrid.services import packagekit
@@ -256,7 +258,8 @@ class PolkitSessionTests(unittest.TestCase):
                                 )
         self.assertEqual(helper_calls, [])
 
-    def test_empty_pk_failure_falls_back_to_helper(self) -> None:
+    def test_empty_pk_failure_does_not_fall_back_to_helper(self) -> None:
+        """Blank/generic PK fail must not open a second pkexec dialog (hunt-4 #2)."""
         from appgrid.services import packagekit
 
         helper_calls: list[tuple] = []
@@ -274,8 +277,9 @@ class PolkitSessionTests(unittest.TestCase):
                 with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
                     with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
                         with mock.patch.object(packagekit.progress, "report"):
-                            packagekit.refresh_and_upgrade_system()
-        self.assertEqual(helper_calls, [("refresh-upgrade", [])])
+                            with self.assertRaises(RuntimeError):
+                                packagekit.refresh_and_upgrade_system()
+        self.assertEqual(helper_calls, [])
 
     def test_refresh_indexes_falls_back_to_helper(self) -> None:
         from appgrid.services import packagekit

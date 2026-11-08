@@ -97,11 +97,11 @@ class AptBackend(PackageBackend):
                 continue
             names.add(name)
             parts = rest.split()
-            # parts[0] is suite; parts[1] is candidate version when present.
-            if len(parts) >= 2 and parts[1] not in {"amd64", "i386", "arm64", "all", "armhf"}:
+            # parts[0] is suite; parts[1] is candidate version when present (#9).
+            arches = {"amd64", "i386", "arm64", "armhf", "armel", "ppc64el", "riscv64", "s390x", "all"}
+            if len(parts) >= 2 and parts[1] not in arches:
                 candidates[name] = parts[1]
-            elif len(parts) >= 3:
-                candidates[name] = parts[1]
+            # Do not fall back to stamping an arch token as the version.
         return candidates, names
 
     def refresh(self) -> list[AppEntry]:
@@ -112,7 +112,11 @@ class AptBackend(PackageBackend):
         for entry in entries:
             pkg = entry.package
             entry.installed = pkg in installed
-            entry.version = candidates.get(pkg) or installed.get(pkg, entry.version)
+            # Prefer uses *installed* version for merge — never the candidate (#3).
+            if pkg in installed:
+                entry.version = installed[pkg]
+            elif pkg in candidates:
+                entry.version = candidates[pkg]
             entry.has_update = pkg in upgradable
             entry.origin = entry.origin or "Ubuntu/Debian"
         return entries

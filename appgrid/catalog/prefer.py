@@ -185,10 +185,16 @@ def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
                 return left
             if by_version < 0:
                 return right
-        if left.release_ts and right.release_ts:
-            if left.release_ts > right.release_ts:
+        # Equal / empty versions: honor one-sided release_ts (# hunt-4 sev 3).
+        if left.release_ts or right.release_ts:
+            if left.release_ts and right.release_ts:
+                if left.release_ts > right.release_ts:
+                    return left
+                if right.release_ts > left.release_ts:
+                    return right
+            elif left.release_ts:
                 return left
-            if right.release_ts > left.release_ts:
+            else:
                 return right
     else:
         if left.release_ts and right.release_ts:
@@ -197,14 +203,18 @@ def newer_source(left: AppEntry, right: AppEntry) -> AppEntry:
             if right.release_ts > left.release_ts:
                 return right
         elif left.release_ts or right.release_ts:
-            # One-sided ts: a clearly newer version on the other side wins (#4).
+            # One-sided ts: runtime-train-safe version compare; newer other wins (#4/#6).
             ts_side = left if left.release_ts else right
             other = right if ts_side is left else left
-            if other.version and ts_side.version:
-                if _cmp_versions(other.version, ts_side.version) > 0:
-                    return other
-            elif other.version and not ts_side.version:
+            by_version = _cross_backend_by_version(other, ts_side)
+            if by_version is other:
                 return other
+            if by_version is ts_side:
+                return ts_side
+            # Incomparable schemes (e.g. 24.08 vs 1.2): prefer non-runtime-train side.
+            if _looks_runtime_train(ts_side.version) and not _looks_runtime_train(other.version):
+                if other.version:
+                    return other
             return ts_side
         by_version = _cross_backend_by_version(left, right)
         if by_version is not None:

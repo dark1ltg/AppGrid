@@ -259,6 +259,53 @@ class PreferMergeTests(unittest.TestCase):
         # No comparable scheme → APT tie-break.
         self.assertIs(newer_source(apt, flatpak), apt)
 
+    def test_one_sided_ts_runtime_train_yields_to_app_version(self) -> None:
+        """One-sided release_ts must not keep a runtime train over a normal version (#6)."""
+        apt = _entry(
+            uid="apt:app",
+            backend="apt",
+            name="App",
+            app_id="org.example.app",
+            package="app",
+            version="1.2.0-1",
+            release_ts=0,
+        )
+        flatpak = _entry(
+            uid="flatpak:org.example.app",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="24.08.1",
+            release_ts=1,
+        )
+        self.assertIs(newer_source(apt, flatpak), apt)
+        self.assertIs(newer_source(flatpak, apt), apt)
+
+    def test_same_backend_equal_version_honors_one_sided_ts(self) -> None:
+        """Equal versions: one-sided release_ts picks the stamped side (hunt-4 sev 3)."""
+        older = _entry(
+            uid="flatpak:a",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="1.0",
+            release_ts=0,
+        )
+        newer = _entry(
+            uid="flatpak:b",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="1.0",
+            release_ts=99,
+        )
+        self.assertIs(newer_source(older, newer), newer)
+        self.assertIs(newer_source(newer, older), newer)
+
 
 if __name__ == "__main__":
     unittest.main()
+
