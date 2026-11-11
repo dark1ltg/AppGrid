@@ -34,6 +34,13 @@ It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are 
 
 ## Install the .deb
 
+**Current release:** [v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) from `master` (`1f73be9`). Prefer the GitHub Release assets (they match `dist/`).
+
+| Package | SHA256 |
+| --- | --- |
+| Online `appgrid_1.0.0-1_all.deb` | `dd4d330058e81fb47f61a535261f9a81620bda35d3584eeaf4da85aaa051e8a5` |
+| Offline `AppGridSetup-1.0.0-amd64.deb` / `appgrid_1.0.0-1_amd64.deb` | `0d2aecf994878d2494b210024b5a8e4a2a62bf7711cd9fcc6ad82fe0bde7605f` |
+
 **Offline installer (Ubuntu 24.04 / Mint 22 amd64):** `dist/AppGridSetup-1.0.0-amd64.deb` (same bits as `appgrid_1.0.0-1_amd64.deb`). Qt/PyQt6 live under `/opt/appgrid`, so they do **not** clash with apt’s Qt. Needs a normal desktop (Python 3, Mesa/OpenGL, GLib). Not for ARM.
 
 Double-click the file in Files. App Center, GNOME Software, Discover, or GDebi should open with an **Install** button, then the usual administrator password prompt. That package does not pull Flatpak or extra Qt from the network.
