@@ -26,15 +26,19 @@ It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are 
 
 ## What you get
 
-- Screenshot-first grid, search, categories, and Installed / Updates views
-- Install, remove, per-app update, and **Update all**
-- APT through PackageKit (normal administrator password prompt), with a narrow PolicyKit helper as fallback
-- Optional Flatpak from Flathub; one merged card per app when enabled
-- A small online `.deb`, plus an offline Setup `.deb` that vendors Qt for double-click install on Ubuntu 24.04 / Mint 22 amd64
+- Screenshot-first grid, search, categories, Installed / Updates, and **Update system**
+- Install, remove, per-app update; dual-install confirm when adding a newer copy beside an older one; **Update installed** when that still applies
+- Optional Flatpak from Flathub; **one card per app** — newer build wins, without APT/Flatpak chrome in the normal UI
+- PackageKit password prompt on a normal desktop session (polkit), with a one-shot PolicyKit helper if no dialog appears
+- Sticky Install/fail status so errors don’t vanish; live progress percent when the backend reports it
+- Updates view re-checks package indexes on a short cooldown; detail **facts** strip (version, license, size, website)
+- Online `.deb`, plus offline **AppGridSetup** that vendors Qt for double-click install on Ubuntu 24.04 / Mint 22 amd64
+
+Full history of the v1.0.0 era: [CHANGELOG.md](CHANGELOG.md).
 
 ## Install the .deb
 
-**Current release:** [v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) from `master` (`0e1453b`). Prefer the GitHub Release assets (they match `dist/`). See [CHANGELOG.md](CHANGELOG.md) for what changed.
+**Current release:** [v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) — same ship as [CHANGELOG.md](CHANGELOG.md) on current `master`. Prefer the GitHub Release assets (they match `dist/`).
 
 | Package | SHA256 |
 | --- | --- |
@@ -104,4 +108,4 @@ On Ubuntu/Debian-family systems the app list loads in the background so the wind
 
 ## License
 
-BSD-2-Clause. See `LICENSE`.
+BSD-2-Clause. See `LICENSE`. Changes: [CHANGELOG.md](CHANGELOG.md).

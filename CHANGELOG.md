@@ -5,11 +5,15 @@ All notable changes to AppGrid are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+Product pitch and install steps live in [README.md](README.md). Packages: [GitHub Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0).
+
 ## [Unreleased]
 
 ## [1.0.0] - 2026-11-11
 
-First public release for Debian-family desktops (Ubuntu 24.04 baseline and close relatives). Ship tip: `0e1453b` on `master`. Packages: [GitHub Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0).
+First public release for Debian-family desktops (Ubuntu 24.04 baseline and close relatives).
+
+**Current ship:** `master` tip (this file + aligned README). **Deb payloads** match [Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) / `dist/` (built at `1f73be9`).
 
 ### Added
 
@@ -33,7 +37,7 @@ First public release for Debian-family desktops (Ubuntu 24.04 baseline and close
 
 - Prefer PackageKit first for system upgrade / index refresh, with helper only as fallback
 - Hide APT vs Flatpak chrome from confirm dialogs and the detail CTA stack (prefs)
-- README expanded to a full product description with screenshots, install steps, and Release SHA256s
+- README expanded to a full product description with screenshots, install steps, Release SHA256s, and highlights that match this release
 
 [Unreleased]: https://github.com/dark1ltg/AppGrid/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0
