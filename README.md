@@ -34,7 +34,7 @@ It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are 
 
 ## Install the .deb
 
-**Current release:** [v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) from `master` (`1f73be9`). Prefer the GitHub Release assets (they match `dist/`).
+**Current release:** [v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) from `master` (`0e1453b`). Prefer the GitHub Release assets (they match `dist/`). See [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 | Package | SHA256 |
 | --- | --- |
