@@ -305,6 +305,31 @@ class PreferMergeTests(unittest.TestCase):
         self.assertIs(newer_source(older, newer), newer)
         self.assertIs(newer_source(newer, older), newer)
 
+    def test_calver_app_version_is_not_runtime_train(self) -> None:
+        """CalVer Flatpak 24.12.3 must Debian-compare vs APT (hunt-5 #4)."""
+        from appgrid.catalog.prefer import _looks_runtime_train
+
+        self.assertFalse(_looks_runtime_train("24.12.3"))
+        self.assertTrue(_looks_runtime_train("24.08.1"))
+        self.assertTrue(_looks_runtime_train("24.08"))
+        apt = _entry(
+            uid="apt:app",
+            backend="apt",
+            name="App",
+            app_id="org.example.app",
+            package="app",
+            version="1.5.0-1",
+        )
+        flatpak = _entry(
+            uid="flatpak:org.example.app",
+            backend="flatpak",
+            name="App",
+            app_id="org.example.app",
+            package="org.example.app",
+            version="24.12.3",
+        )
+        self.assertIs(newer_source(apt, flatpak), flatpak)
+
 
 if __name__ == "__main__":
     unittest.main()

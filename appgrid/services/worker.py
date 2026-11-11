@@ -189,7 +189,9 @@ class ActionWorker(QThread):
                     message = "Package updates finished."
                 if cancelled_note:
                     message += cancelled_note
-                elif failed:
+                    self.finished_ok.emit(message)
+                    return
+                if failed:
                     kinds = {item[0] for item in failed}
                     cancelish = [
                         msg for _, msg in failed if "cancel" in (msg or "").lower()
@@ -203,6 +205,8 @@ class ActionWorker(QThread):
                         message += " System package updates could not be completed."
                     else:
                         message += " Some updates could not be completed."
+                    # Non-cancel partial backend failure → fail sticky (hunt-5 sev 3).
+                    raise RuntimeError(message)
                 self.finished_ok.emit(message)
                 return
             if self._entry is None:

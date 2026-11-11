@@ -141,11 +141,23 @@ def _debian_weight(char: str) -> tuple[int, int]:
 
 
 def _looks_runtime_train(version: str) -> bool:
-    """Flatpak runtime-style trains (e.g. 24.08.1) mis-rank as Debian vs 1.2.0 (#8)."""
+    """GNOME/Freedesktop runtime ABI trains (e.g. 24.08 / 24.08.1), not CalVer apps (#4).
+
+    Only YY.02 / YY.08 (major ≥ 20) count — CalVer app versions like 24.12.3 must
+    still Debian-compare against APT.
+    """
     text = (version or "").strip()
     if not text:
         return False
-    return bool(re.match(r"^\d{2}\.\d{2}(\.|$)", text))
+    match = re.match(r"^(\d{2})\.(\d{2})(?:\.(\d+))?$", text)
+    if not match:
+        return False
+    year = int(match.group(1))
+    month = match.group(2)
+    if year < 20:
+        return False
+    # GNOME / Freedesktop Platform ABI months.
+    return month in {"02", "08"}
 
 
 def _cross_backend_by_version(left: AppEntry, right: AppEntry) -> AppEntry | None:

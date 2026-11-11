@@ -148,7 +148,7 @@ class PackageKitFirstTests(unittest.TestCase):
         with mock.patch.object(packagekit, "run_streaming", return_value=(5, "")):
             with self.assertRaises(RuntimeError) as ctx:
                 packagekit._run(["/usr/bin/pkcon", "--plain", "-y", "install", "hello"])
-        # Blank output is a plain PackageKit fail — not auth / helper bait (hunt-4 #2).
+        # Blank + exit 5 stays plain fail (noop territory); auth-ish blanks use exit 1/3/… (#3).
         text = str(ctx.exception).lower()
         self.assertIn("packagekit", text)
         self.assertNotIn("authorization", text)
@@ -258,8 +258,8 @@ class PolkitSessionTests(unittest.TestCase):
                                 )
         self.assertEqual(helper_calls, [])
 
-    def test_empty_pk_failure_does_not_fall_back_to_helper(self) -> None:
-        """Blank/generic PK fail must not open a second pkexec dialog (hunt-4 #2)."""
+    def test_plain_pk_failure_does_not_fall_back_to_helper(self) -> None:
+        """Generic PackageKit failed text (not auth) must not open pkexec (hunt-4 #2)."""
         from appgrid.services import packagekit
 
         helper_calls: list[tuple] = []
@@ -280,6 +280,30 @@ class PolkitSessionTests(unittest.TestCase):
                             with self.assertRaises(RuntimeError):
                                 packagekit.refresh_and_upgrade_system()
         self.assertEqual(helper_calls, [])
+
+    def test_blank_authish_exit_falls_back_to_helper(self) -> None:
+        """Blank PK + auth-ish exit raises auth message → helper once (hunt-5 #3)."""
+        from appgrid.services import packagekit
+
+        helper_calls: list[tuple] = []
+
+        def fake_run_packagekit(verb: str, packages: list[str] | None = None) -> None:
+            raise RuntimeError(packagekit._auth_fail_message("", 1))
+
+        def fake_run_helper(action: str, packages: list[str]) -> None:
+            helper_calls.append((action, list(packages)))
+
+        with mock.patch.object(
+            packagekit, "_packagekit_cli", return_value=("/usr/bin/pkgcli", "pkgcli")
+        ):
+            with mock.patch.object(packagekit, "_helper", return_value="/usr/bin/appgrid-apt-helper"):
+                with mock.patch.object(packagekit, "_run_packagekit", fake_run_packagekit):
+                    with mock.patch.object(packagekit, "_run_helper", fake_run_helper):
+                        with mock.patch.object(packagekit.progress, "report"):
+                            packagekit._one_auth_path(
+                                "install", ["hello"], "install", ["install", "-y", "hello"]
+                            )
+        self.assertEqual(helper_calls, [("install", ["hello"])])
 
     def test_refresh_indexes_falls_back_to_helper(self) -> None:
         from appgrid.services import packagekit

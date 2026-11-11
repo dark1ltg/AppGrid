@@ -7,17 +7,20 @@ from appgrid.helpers.apt_helper import is_safe_package_name
 from appgrid.services import progress
 from appgrid.services.jobs import CancelledError, run_streaming
 
-_CANCEL_TEXT = ("dismissed", "not authorized", "cancelled", "canceled")
-# Do not include bare "already" — matches "already locked" / "already running" (#1).
+# Dismiss / cancel only — bare "not authorized" is auth/policy, not Cancel (#6).
+_CANCEL_TEXT = ("dismissed", "cancelled", "canceled")
+# Narrow noops: do not include bare "already" or bare "no packages" (#1).
 _NOOP_TEXT = (
     "nothing useful",
     "no updates",
-    "no packages",
+    "no packages require",
+    "no packages to update",
+    "no packages need",
     "already up-to-date",
     "already up to date",
     "already the newest",
 )
-# Only explicit “no dialog / no session” — not blank output, not wrong password (#2).
+# Explicit “no dialog / no session” — blank uses a separate auth-ish exit path (#3).
 _HELPER_FALLBACK_TEXT = (
     "failed to obtain authorization",
     "no session for cookie",
@@ -31,6 +34,9 @@ _WRONG_PASSWORD_TEXT = (
     "incorrect password",
     "not authenticated",
 )
+# Blank CLI + these exits → treat as no-dialog auth so helper can recover once (#3).
+# Exit 5 stays plain fail (noop / busy territory, not typical blank auth).
+_BLANK_AUTH_EXITS = frozenset({1, 2, 3, 4, 7})
 _PK_VERBS = frozenset(
     {
         "install",
@@ -87,15 +93,18 @@ def _looks_wrong_password(output: str) -> bool:
 
 
 def _looks_helper_fallback(output: str) -> bool:
-    """True only for explicit no-dialog/session auth failures (#2).
+    """True for explicit no-dialog/session auth failures (#2/#3/#6).
 
-    Blank PackageKit output does **not** open pkexec — that caused a second
-    password dialog after odd empty failures.
+    Blank PackageKit output alone does **not** match — blank is raised as an
+    auth message only for auth-ish exit codes in `_run`, which then matches here.
+    Bare "not authorized" (no longer Cancel) also recovers via helper (#6).
     """
     text = (output or "").lower()
     if _looks_wrong_password(text):
         return False
     if any(token in text for token in _HELPER_FALLBACK_TEXT):
+        return True
+    if "not authorized" in text:
         return True
     if "no password dialog" in text and any(
         token in text for token in _HELPER_FALLBACK_TEXT
@@ -109,8 +118,39 @@ def _auth_fail_message(output: str, code: int) -> str:
     base = (output or "").strip() or "Failed to obtain authorization"
     return (
         f"{base}. No password dialog appeared. On Kubuntu, confirm "
-        "polkit-kde-agent-1 is running, then try Install again."
+        "polkit-kde-agent-1 is running, then try again."
     )
+
+
+def _handle_exit5(name: str, code: int, output: str, argv: list[str]) -> str:
+    """Shared pkcon/pkgcli exit-5 noop / fail-closed logic (#1/#2/#5)."""
+    lowered = (output or "").lower()
+    verb, packages = _pk_verb_and_packages(argv)
+    mutating = verb in {"install", "remove", "update", "upgrade"}
+    if any(
+        token in lowered
+        for token in ("not found", "couldn't find", "could not find", "no such package")
+    ):
+        raise RuntimeError(_fail_message(output, code, "Package not found"))
+    # Busy/locked must not look like success.
+    if any(
+        token in lowered
+        for token in ("locked", "already running", "cannot obtain lock", "unable to acquire")
+    ):
+        raise RuntimeError(_fail_message(output, code, "PackageKit is busy"))
+    if mutating and packages:
+        raise RuntimeError(
+            _fail_message(output, code, f"PackageKit could not {verb} the package")
+        )
+    if output and any(token in lowered for token in _NOOP_TEXT):
+        return output
+    if verb in {"refresh", "update", "upgrade"} and not packages:
+        # Exit 5 with no clear noop text on refresh/update → fail closed (#1/#2).
+        if not any(token in lowered for token in _NOOP_TEXT):
+            raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
+        return output
+    # No catch-all soft-success for other empty-package verbs (hunt-5 sev 3).
+    raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
 
 
 def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
@@ -126,45 +166,22 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> str:
                 _fail_message(output, code, "Administrator password was not accepted")
             )
         lowered = (output or "").lower()
-        # Explicit no-agent text → auth message (helper may recover). Blank → plain fail (#2).
+        # Explicit no-agent text → auth message (helper may recover).
         if any(token in lowered for token in _HELPER_FALLBACK_TEXT):
             raise RuntimeError(_auth_fail_message(output, code))
+        # Bare "not authorized" (not dismissed) → auth path / helper, not Cancel (#6).
+        if "not authorized" in lowered:
+            raise RuntimeError(_auth_fail_message(output, code))
         if not (output or "").strip():
+            # Blank + auth-ish exit → helper can recover once; else plain fail (#3).
+            if code in _BLANK_AUTH_EXITS:
+                raise RuntimeError(_auth_fail_message(output, code))
             raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
         if name == "pkexec":
             raise RuntimeError(_fail_message(output, code, "pkexec failed"))
-        verb, packages = _pk_verb_and_packages(argv)
-        mutating = verb in {"install", "remove", "update", "upgrade"}
-        # pkcon: 5 = nothing useful / cancel on some versions. Never treat that as
-        # success for install/remove/update when packages were named (Kubuntu silent fail).
-        if name == "pkcon" and code == 5:
-            if any(
-                token in lowered
-                for token in ("not found", "couldn't find", "could not find", "no such package")
-            ):
-                raise RuntimeError(_fail_message(output, code, "Package not found"))
-            # Busy/locked must not look like success (#1).
-            if any(
-                token in lowered
-                for token in ("locked", "already running", "cannot obtain lock", "unable to acquire")
-            ):
-                raise RuntimeError(_fail_message(output, code, "PackageKit is busy"))
-            if mutating and packages:
-                raise RuntimeError(
-                    _fail_message(output, code, f"PackageKit could not {verb} the package")
-                )
-            if output and any(token in lowered for token in _NOOP_TEXT):
-                return output
-            if verb in {"refresh", "update", "upgrade"} and not packages:
-                # Exit 5 with no clear noop text on system update/refresh → fail closed (#1).
-                if verb in {"update", "upgrade"} and not any(
-                    token in lowered for token in _NOOP_TEXT
-                ):
-                    raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
-                return output
-            if not packages:
-                return output
-            raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
+        # pkcon and pkgcli share exit-5 noop handling (#5).
+        if name in {"pkcon", "pkgcli"} and code == 5:
+            return _handle_exit5(name, code, output, argv)
         raise RuntimeError(_fail_message(output, code, "PackageKit failed"))
     if code != 0:
         if _looks_cancelled(output):
@@ -309,8 +326,8 @@ def _packagekit_then_helper(
 def _one_auth_path(pk_verb: str, packages: list[str], helper_action: str, apt_args: list[str]) -> None:
     """Use PackageKit or the helper, never both on success (avoids two password windows).
 
-    Helper fallback only when PackageKit could not show a dialog — not after a
-    wrong password, and not on blank/empty PK output (#2).
+    Helper fallback when PackageKit could not show a dialog — not after a
+    wrong password. Blank output recovers only for auth-ish exit codes (#3).
     """
     if _packagekit_then_helper(pk_verb, helper_action, packages):
         return
