@@ -9,11 +9,15 @@ Product pitch and install steps live in [README.md](README.md). Packages: [GitHu
 
 ## [Unreleased]
 
+### Changed
+
+- **Browse by categories** sits under search and opens the category chip strip; the strip no longer auto-scrolls (static / flickable chips only); **Clear filter** is the last chip and resets to All while closing the strip
+
+**Current ship:** `master` tip includes the Categories browse change above. **Deb payloads** on [Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) / `dist/` are rebuilt to match (same `1.0.0-1` package version).
+
 ## [1.0.0] - 2026-11-11
 
 First public release for Debian-family desktops (Ubuntu 24.04 baseline and close relatives).
-
-**Current ship:** `master` tip (this file + aligned README). **Deb payloads** match [Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) / `dist/` (built at `1f73be9`).
 
 ### Added
 

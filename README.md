@@ -26,7 +26,7 @@ It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are 
 
 ## What you get
 
-- Screenshot-first grid, search, categories, Installed / Updates, and **Update system**
+- Screenshot-first grid, search, **Browse by categories** (chip strip under search; Clear filter resets), Installed / Updates, and **Update system**
 - Install, remove, per-app update; dual-install confirm when adding a newer copy beside an older one; **Update installed** when that still applies
 - Optional Flatpak from Flathub; **one card per app** — newer build wins, without APT/Flatpak chrome in the normal UI
 - PackageKit password prompt on a normal desktop session (polkit), with a one-shot PolicyKit helper if no dialog appears
@@ -42,8 +42,8 @@ Full history of the v1.0.0 era: [CHANGELOG.md](CHANGELOG.md).
 
 | Package | SHA256 |
 | --- | --- |
-| Online `appgrid_1.0.0-1_all.deb` | `dd4d330058e81fb47f61a535261f9a81620bda35d3584eeaf4da85aaa051e8a5` |
-| Offline `AppGridSetup-1.0.0-amd64.deb` / `appgrid_1.0.0-1_amd64.deb` | `0d2aecf994878d2494b210024b5a8e4a2a62bf7711cd9fcc6ad82fe0bde7605f` |
+| Online `appgrid_1.0.0-1_all.deb` | `317940414f8725740733a6cd5605d4c454139e2b6bef0544536008124f51396e` |
+| Offline `AppGridSetup-1.0.0-amd64.deb` / `appgrid_1.0.0-1_amd64.deb` | `8034b76f384eb66ead4a1b5174ff14b720a10054648599dd08a53dc9097e3a27` |
 
 **Offline installer (Ubuntu 24.04 / Mint 22 amd64):** `dist/AppGridSetup-1.0.0-amd64.deb` (same bits as `appgrid_1.0.0-1_amd64.deb`). Qt/PyQt6 live under `/opt/appgrid`, so they do **not** clash with apt’s Qt. Needs a normal desktop (Python 3, Mesa/OpenGL, GLib). Not for ARM.
 

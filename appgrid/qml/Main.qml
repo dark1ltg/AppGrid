@@ -23,12 +23,16 @@ ApplicationWindow {
 
     header: ToolBar {
         Material.background: "#1A1F29"
-        height: 64
+        height: 92
+        // Explicit fill — Material.background alone can fail to paint the strip.
+        background: Rectangle { color: "#1A1F29" }
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 20
             anchors.rightMargin: 16
-            spacing: 16
+            anchors.topMargin: 8
+            anchors.bottomMargin: 8
+            spacing: 12
 
             Label {
                 text: "AppGrid"
@@ -36,36 +40,70 @@ ApplicationWindow {
                 font.pixelSize: Fonts.heading
                 font.weight: Fonts.bold
                 color: "#F2F6FB"
+                Layout.alignment: Qt.AlignVCenter
             }
 
-            TextField {
-                id: search
+            ColumnLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 40
-                placeholderText: "Search applications"
-                font.family: Fonts.sans
-                font.pixelSize: Fonts.nav
-                font.weight: Fonts.regular
-                onTextChanged: controller.setSearch(text)
-            }
+                spacing: 6
 
-            Button {
-                id: categoryButton
-                enabled: controller.supportedDistro
-                text: controller.categoryFilter === "" ? "Categories" : categoryButton.currentLabel
-                font.family: Fonts.sans
-                font.pixelSize: Fonts.button
-                font.weight: Fonts.medium
-                readonly property string currentLabel: {
-                    var items = controller.categories
-                    for (var i = 0; i < items.length; i++) {
-                        if (items[i].id === controller.categoryFilter)
-                            return items[i].label
+                TextField {
+                    id: search
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    placeholderText: "Search applications"
+                    font.family: Fonts.sans
+                    font.pixelSize: Fonts.nav
+                    font.weight: Fonts.regular
+                    color: "#F2F6FB"
+                    placeholderTextColor: "#7E8B9A"
+                    background: Rectangle {
+                        radius: 8
+                        color: "#12151C"
+                        border.width: 1
+                        border.color: "#2A3344"
                     }
-                    return "Categories"
+                    onTextChanged: controller.setSearch(text)
                 }
-                Material.background: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#2A6F6A" : "#243044"
-                onClicked: root.categoryBannerOpen = !root.categoryBannerOpen
+
+                Button {
+                    id: categoryButton
+                    enabled: controller.supportedDistro
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 30
+                    text: {
+                        if (controller.categoryFilter !== "")
+                            return "Showing: " + categoryButton.currentLabel
+                        return root.categoryBannerOpen ? "Browse by categories ▾" : "Browse by categories"
+                    }
+                    font.family: Fonts.sans
+                    font.pixelSize: Fonts.chip
+                    font.weight: Fonts.medium
+                    readonly property string currentLabel: {
+                        var items = controller.categories
+                        for (var i = 0; i < items.length; i++) {
+                            if (items[i].id === controller.categoryFilter)
+                                return items[i].label
+                        }
+                        return "All"
+                    }
+                    background: Rectangle {
+                        radius: 6
+                        color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#2A6F6A" : "#243044"
+                        border.width: 1
+                        border.color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#3D9B93" : "#2A3344"
+                    }
+                    contentItem: Text {
+                        text: categoryButton.text
+                        font: categoryButton.font
+                        color: "#F2F6FB"
+                        horizontalAlignment: Text.AlignLeft
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 10
+                        elide: Text.ElideRight
+                    }
+                    onClicked: root.categoryBannerOpen = !root.categoryBannerOpen
+                }
             }
 
             Repeater {
@@ -81,6 +119,7 @@ ApplicationWindow {
                     font.weight: Fonts.medium
                     checkable: true
                     checked: controller.filterMode === modelData.id
+                    Layout.alignment: Qt.AlignVCenter
                     onClicked: controller.setFilter(modelData.id)
                     Material.background: checked ? "#2A6F6A" : "#243044"
                 }
@@ -91,6 +130,7 @@ ApplicationWindow {
                 font.family: Fonts.sans
                 font.pixelSize: Fonts.button
                 font.weight: Fonts.medium
+                Layout.alignment: Qt.AlignVCenter
                 onClicked: settingsDialog.open()
             }
 
@@ -100,6 +140,7 @@ ApplicationWindow {
                 font.pixelSize: Fonts.button
                 font.weight: Fonts.medium
                 enabled: !controller.busy && controller.supportedDistro
+                Layout.alignment: Qt.AlignVCenter
                 onClicked: controller.updateAll()
             }
         }
@@ -189,12 +230,13 @@ ApplicationWindow {
             readonly property int minCell: 228
             readonly property int minCellH: 278
             readonly property int tickerMax: 52
+            // One chip row (no duplicated marquee loop). Clear filter is appended in the strip.
             readonly property var tickerSource: {
                 var items = [{ "id": "all", "label": "All" }]
                 var cats = controller.categories
                 for (var i = 0; i < cats.length; i++)
                     items.push(cats[i])
-                return items.concat(items)
+                return items
             }
             readonly property int available: Math.max(minCell, width - gridMargin * 2)
             readonly property int availableH: Math.max(minCellH, height - gridMargin * 2 - tickerBar.height)
@@ -223,13 +265,6 @@ ApplicationWindow {
                     }
                 }
 
-                onHeightChanged: {
-                    if (height >= gridPageRoot.tickerMax - 1 && tickerRow.width > 1) {
-                        tickerAnim.to = -(tickerRow.width / 2)
-                        tickerAnim.restart()
-                    }
-                }
-
                 Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -239,17 +274,22 @@ ApplicationWindow {
                     visible: tickerBar.height > 1
                 }
 
-                Item {
-                    id: tickerClip
+                Flickable {
+                    id: tickerFlick
                     anchors.fill: parent
-                    anchors.leftMargin: 8
-                    anchors.rightMargin: 8
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    contentWidth: tickerRow.width
+                    contentHeight: height
                     clip: true
+                    interactive: tickerRow.width > width
+                    boundsBehavior: Flickable.StopAtBounds
                     visible: tickerBar.height > 8
+                    flickableDirection: Flickable.HorizontalFlick
 
                     Row {
                         id: tickerRow
-                        y: (parent.height - height) / 2
+                        y: (tickerFlick.height - height) / 2
                         spacing: 10
 
                         Repeater {
@@ -279,47 +319,33 @@ ApplicationWindow {
                                 }
                             }
                         }
-                    }
 
-                    NumberAnimation {
-                        id: tickerAnim
-                        target: tickerRow
-                        property: "x"
-                        from: 0
-                        to: tickerRow.width > 0 ? -(tickerRow.width / 2) : 0
-                        duration: Math.max(14000, tickerRow.width * 12)
-                        loops: Animation.Infinite
-                        running: root.categoryBannerOpen && tickerBar.height > 40 && !tickerHover.hovered
-                        easing.type: Easing.Linear
-                    }
-
-                    HoverHandler {
-                        id: tickerHover
-                    }
-                }
-
-                Rectangle {
-                    width: 56
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    visible: tickerBar.height > 8
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#151A22" }
-                        GradientStop { position: 1.0; color: "#00151A22" }
-                    }
-                }
-                Rectangle {
-                    width: 56
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    visible: tickerBar.height > 8
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#00151A22" }
-                        GradientStop { position: 1.0; color: "#151A22" }
+                        // Last chip: reset to All and close the strip.
+                        Rectangle {
+                            height: 32
+                            width: clearChipLabel.implicitWidth + 28
+                            radius: 16
+                            color: "#243044"
+                            border.width: 1
+                            border.color: "#3D9B93"
+                            Text {
+                                id: clearChipLabel
+                                anchors.centerIn: parent
+                                text: "Clear filter"
+                                color: "#F2F6FB"
+                                font.family: Fonts.sans
+                                font.pixelSize: Fonts.chip
+                                font.weight: Fonts.medium
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    controller.setCategory("all")
+                                    root.categoryBannerOpen = false
+                                }
+                            }
+                        }
                     }
                 }
             }
