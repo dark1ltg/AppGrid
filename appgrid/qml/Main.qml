@@ -23,15 +23,16 @@ ApplicationWindow {
 
     header: ToolBar {
         Material.background: "#1A1F29"
-        height: 92
+        height: 64
         // Explicit fill — Material.background alone can fail to paint the strip.
         background: Rectangle { color: "#1A1F29" }
+        // One row: Logo | Search | compact Browse pill | nav actions (all V-centered).
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 20
             anchors.rightMargin: 16
-            anchors.topMargin: 8
-            anchors.bottomMargin: 8
+            anchors.topMargin: 10
+            anchors.bottomMargin: 10
             spacing: 12
 
             Label {
@@ -43,67 +44,64 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignVCenter
             }
 
-            ColumnLayout {
+            TextField {
+                id: search
                 Layout.fillWidth: true
-                spacing: 6
+                Layout.preferredHeight: 36
+                Layout.alignment: Qt.AlignVCenter
+                placeholderText: "Search applications"
+                font.family: Fonts.sans
+                font.pixelSize: Fonts.nav
+                font.weight: Fonts.regular
+                color: "#F2F6FB"
+                placeholderTextColor: "#7E8B9A"
+                background: Rectangle {
+                    radius: 8
+                    color: "#12151C"
+                    border.width: 1
+                    border.color: "#2A3344"
+                }
+                onTextChanged: controller.setSearch(text)
+            }
 
-                TextField {
-                    id: search
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 36
-                    placeholderText: "Search applications"
-                    font.family: Fonts.sans
-                    font.pixelSize: Fonts.nav
-                    font.weight: Fonts.regular
+            Button {
+                id: categoryButton
+                enabled: controller.supportedDistro
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredHeight: 32
+                // Chip-sized: width follows label, not full-width under search.
+                Layout.preferredWidth: categoryLabel.implicitWidth + 28
+                text: {
+                    if (controller.categoryFilter !== "")
+                        return "Showing: " + categoryButton.currentLabel
+                    return root.categoryBannerOpen ? "Browse by Category ▾" : "Browse by Category"
+                }
+                font.family: Fonts.sans
+                font.pixelSize: Fonts.chip
+                font.weight: Fonts.medium
+                readonly property string currentLabel: {
+                    var items = controller.categories
+                    for (var i = 0; i < items.length; i++) {
+                        if (items[i].id === controller.categoryFilter)
+                            return items[i].label
+                    }
+                    return "All"
+                }
+                background: Rectangle {
+                    radius: 16
+                    color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#2A6F6A" : "#243044"
+                    border.width: 1
+                    border.color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#3D9B93" : "#2A3344"
+                }
+                contentItem: Text {
+                    id: categoryLabel
+                    text: categoryButton.text
+                    font: categoryButton.font
                     color: "#F2F6FB"
-                    placeholderTextColor: "#7E8B9A"
-                    background: Rectangle {
-                        radius: 8
-                        color: "#12151C"
-                        border.width: 1
-                        border.color: "#2A3344"
-                    }
-                    onTextChanged: controller.setSearch(text)
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
-
-                Button {
-                    id: categoryButton
-                    enabled: controller.supportedDistro
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 30
-                    text: {
-                        if (controller.categoryFilter !== "")
-                            return "Showing: " + categoryButton.currentLabel
-                        return root.categoryBannerOpen ? "Browse by categories ▾" : "Browse by categories"
-                    }
-                    font.family: Fonts.sans
-                    font.pixelSize: Fonts.chip
-                    font.weight: Fonts.medium
-                    readonly property string currentLabel: {
-                        var items = controller.categories
-                        for (var i = 0; i < items.length; i++) {
-                            if (items[i].id === controller.categoryFilter)
-                                return items[i].label
-                        }
-                        return "All"
-                    }
-                    background: Rectangle {
-                        radius: 6
-                        color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#2A6F6A" : "#243044"
-                        border.width: 1
-                        border.color: (root.categoryBannerOpen || controller.categoryFilter !== "") ? "#3D9B93" : "#2A3344"
-                    }
-                    contentItem: Text {
-                        text: categoryButton.text
-                        font: categoryButton.font
-                        color: "#F2F6FB"
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
-                        leftPadding: 10
-                        elide: Text.ElideRight
-                    }
-                    onClicked: root.categoryBannerOpen = !root.categoryBannerOpen
-                }
+                onClicked: root.categoryBannerOpen = !root.categoryBannerOpen
             }
 
             Repeater {
@@ -135,7 +133,7 @@ ApplicationWindow {
             }
 
             Button {
-                text: "Update system"
+                text: "Update System"
                 font.family: Fonts.sans
                 font.pixelSize: Fonts.button
                 font.weight: Fonts.medium
@@ -279,7 +277,8 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    contentWidth: tickerRow.width
+                    // Wide enough to scroll when chips overflow; otherwise center the row.
+                    contentWidth: Math.max(width, tickerRow.width)
                     contentHeight: height
                     clip: true
                     interactive: tickerRow.width > width
@@ -289,6 +288,7 @@ ApplicationWindow {
 
                     Row {
                         id: tickerRow
+                        x: Math.max(0, (tickerFlick.width - width) / 2)
                         y: (tickerFlick.height - height) / 2
                         spacing: 10
 
