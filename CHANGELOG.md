@@ -14,7 +14,7 @@ Product pitch and install steps live in [README.md](README.md). Packages: [GitHu
 - **Header:** one horizontal row — AppGrid logo, search, compact **Browse by Category** pill, then All / Installed / Updates / Settings / Update System (all vertically aligned). Opening Browse shows a **centered** category chip strip under the header; **Clear filter** remains the last chip (resets to All and closes the strip). No marquee.
 - Earlier: **Browse by categories** under search with a static / flickable chip strip (no auto-scroll)
 
-**Current ship:** this branch includes the header layout above. **Deb payloads** on [Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) / `dist/` are rebuilt to match (same `1.0.0-1` package version).
+**Current ship:** `master` tip includes the header layout above. **Deb payloads** and source tag on [Release v1.0.0](https://github.com/dark1ltg/AppGrid/releases/tag/v1.0.0) / `dist/` are rebuilt to match (same `1.0.0-1` package version).
 
 ## [1.0.0] - 2026-11-11
 
