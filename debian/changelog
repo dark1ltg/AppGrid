@@ -1,7 +1,9 @@
 appgrid (1.0.0-1) noble; urgency=medium
 
+  * One-row header: logo, search, compact Browse by Category pill, nav.
+  * Centered category chip strip when Browse is open; Clear filter last.
   * Initial Qt 6 rewrite with APT and optional Flatpak.
   * Target Ubuntu 24.04 LTS, Debian 12, and derivatives (Mint 22,
     elementary OS 8, Pop!_OS 24.04). Uses distro PyQt6, not PySide6.
 
- -- AppGrid contributors <appgrid@localhost>  Sat, 12 Sep 2026 22:42:00 -0400
+ -- AppGrid contributors <appgrid@localhost>  Thu, 19 Nov 2026 23:35:00 +0000

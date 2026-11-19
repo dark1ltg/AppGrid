@@ -6,6 +6,8 @@ You browse desktop applications as a **screenshot grid**. Each tile shows a real
 
 ![AppGrid screenshot grid](docs/ui-grid.png)
 
+![Browse by Category chip strip](docs/ui-categories-ticker.png)
+
 ![App detail page](docs/ui-detail.png)
 
 ## Why AppGrid exists
@@ -26,7 +28,7 @@ It is **not** for Arch, CachyOS, Fedora, or other unrelated families. Those are 
 
 ## What you get
 
-- Screenshot-first grid, search, **Browse by categories** (chip strip under search; Clear filter resets), Installed / Updates, and **Update system**
+- Screenshot-first grid; one-row header with search and a compact **Browse by Category** pill; centered category chips when open (Clear filter resets); Installed / Updates / **Update System**
 - Install, remove, per-app update; dual-install confirm when adding a newer copy beside an older one; **Update installed** when that still applies
 - Optional Flatpak from Flathub; **one card per app** — newer build wins, without APT/Flatpak chrome in the normal UI
 - PackageKit password prompt on a normal desktop session (polkit), with a one-shot PolicyKit helper if no dialog appears
@@ -42,8 +44,8 @@ Full history of the v1.0.0 era: [CHANGELOG.md](CHANGELOG.md).
 
 | Package | SHA256 |
 | --- | --- |
-| Online `appgrid_1.0.0-1_all.deb` | `317940414f8725740733a6cd5605d4c454139e2b6bef0544536008124f51396e` |
-| Offline `AppGridSetup-1.0.0-amd64.deb` / `appgrid_1.0.0-1_amd64.deb` | `8034b76f384eb66ead4a1b5174ff14b720a10054648599dd08a53dc9097e3a27` |
+| Online `appgrid_1.0.0-1_all.deb` | `4559d468c09f087bed40d205ea48af4d77000d932a0116a5ac3705c16d04e66e` |
+| Offline `AppGridSetup-1.0.0-amd64.deb` / `appgrid_1.0.0-1_amd64.deb` | `96e073005803ef71d3ea08cd4fab18e801e233997716239b27c152552e5fdc46` |
 
 **Offline installer (Ubuntu 24.04 / Mint 22 amd64):** `dist/AppGridSetup-1.0.0-amd64.deb` (same bits as `appgrid_1.0.0-1_amd64.deb`). Qt/PyQt6 live under `/opt/appgrid`, so they do **not** clash with apt’s Qt. Needs a normal desktop (Python 3, Mesa/OpenGL, GLib). Not for ARM.
 
